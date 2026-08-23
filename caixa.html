@@ -29,6 +29,27 @@
     background: var(--ink-line); color: var(--text-primary);
   }
 
+  /* ---- Linha de status do caixa (abertura/fechamento do turno) ---- */
+  .caixa-status-linha {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    padding: 0 20px 16px;
+  }
+  .caixa-status-badge {
+    font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 14px;
+  }
+  .caixa-status-badge.aberto { background: rgba(92,122,82,.18); color: #9CBF8F; }
+  .caixa-status-badge.fechado { background: rgba(214,67,42,.14); color: #F0A08D; }
+  .caixa-status-detalhe { font-size: 11.5px; color: var(--text-muted); margin-left: 8px; font-family: var(--font-mono); }
+  .caixa-status-botoes { display: flex; gap: 8px; }
+  .btn-caixa-acao {
+    font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 16px;
+    background: linear-gradient(135deg, #ff7a1a, #ff2d78); color: #fff;
+  }
+  .btn-historico-caixa {
+    font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 16px;
+    background: var(--ink-line); color: var(--text-primary);
+  }
+
   /* ---- Tela: histórico ---- */
   #tela-historico { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .historico-periodo { display: flex; gap: 8px; padding: 0 20px 12px; }
@@ -103,6 +124,49 @@
     display: flex; justify-content: space-between; font-family: var(--font-display); font-weight: 700;
     font-size: 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--ink-line);
   }
+
+  /* ---- Modais de Abrir/Fechar/Histórico de Caixa ---- */
+  .modal-caixa-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65);
+    align-items: center; justify-content: center; z-index: 160; padding: 20px;
+  }
+  .modal-caixa-conteudo {
+    background: var(--ink); border-radius: var(--radius-lg); padding: 22px;
+    width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto; position: relative;
+  }
+  .modal-caixa-conteudo h3 { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin-bottom: 8px; padding-right: 20px; }
+  .modal-caixa-aviso { font-size: 12.5px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5; }
+  .fechar-caixa-secao-label {
+    font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; color: var(--crust);
+    letter-spacing: .03em; margin: 18px 0 8px;
+  }
+  .fechar-caixa-secao-label:first-of-type { margin-top: 0; }
+  .fechar-caixa-linha {
+    display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;
+  }
+  .fechar-caixa-linha.total {
+    font-weight: 700; border-top: 1px solid var(--ink-line); margin-top: 4px; padding-top: 10px;
+  }
+  .fechar-caixa-linha.esperado {
+    font-weight: 700; border-top: 1px solid var(--ink-line); margin-top: 4px; padding-top: 10px; font-size: 15px;
+  }
+  #fechar-caixa-diferenca {
+    margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 700; text-align: center;
+  }
+  #fechar-caixa-diferenca.bateu { background: rgba(92,122,82,.18); color: #9CBF8F; }
+  #fechar-caixa-diferenca.faltando { background: rgba(214,67,42,.14); color: #F0A08D; }
+  #fechar-caixa-diferenca.sobrando { background: rgba(232,162,58,.14); color: #E8A23A; }
+
+  .caixa-turno-linha {
+    background: var(--ink-soft); border: 1px solid var(--ink-line); border-radius: var(--radius-sm);
+    padding: 12px 14px; margin-bottom: 8px; font-size: 12.5px;
+  }
+  .caixa-turno-topo { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 4px; }
+  .caixa-turno-detalhe { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+  .caixa-turno-dif { margin-top: 6px; font-weight: 700; }
+  .caixa-turno-dif.bateu { color: #9CBF8F; }
+  .caixa-turno-dif.faltando { color: #F0A08D; }
+  .caixa-turno-dif.sobrando { color: #E8A23A; }
 
   #grid-comandas {
     flex: 1; overflow-y: auto; padding: 4px 20px 24px;
@@ -228,6 +292,18 @@
     <span class="contador" id="contador-comandas">0 abertas</span>
     <button class="btn-historico" onclick="abrirHistorico()">📜 Histórico</button>
   </div>
+
+  <div class="caixa-status-linha">
+    <div>
+      <span class="caixa-status-badge" id="caixa-status-badge">Verificando...</span>
+      <span class="caixa-status-detalhe" id="caixa-status-detalhe"></span>
+    </div>
+    <div class="caixa-status-botoes">
+      <button class="btn-caixa-acao" id="btn-caixa-acao" style="display:none;" onclick="cliqueBotaoCaixa()"></button>
+      <button class="btn-historico-caixa" onclick="abrirHistoricoCaixa()">🗂️ Turnos</button>
+    </div>
+  </div>
+
   <div id="grid-comandas"><div class="aviso-vazio">Carregando...</div></div>
 </div>
 
@@ -326,6 +402,57 @@
     <h3 id="ver-historico-titulo">—</h3>
     <div class="ver-historico-numero" id="ver-historico-numero">—</div>
     <div id="ver-historico-conteudo"></div>
+  </div>
+</div>
+
+<!-- MODAL: abrir caixa -->
+<div id="modal-abrir-caixa-overlay" class="modal-caixa-overlay">
+  <div class="modal-caixa-conteudo">
+    <h3>🔓 Abrir Caixa</h3>
+    <p class="modal-caixa-aviso">Informa quanto de troco está deixando na gaveta pra começar o turno.</p>
+    <div class="campo">
+      <label>Valor de troco inicial (R$)</label>
+      <input type="text" inputmode="decimal" id="input-abrir-caixa-valor" placeholder="0,00">
+    </div>
+    <div class="modal-botoes">
+      <button class="btn-ghost" onclick="fecharModalAbrirCaixa()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarAberturaCaixa()">Abrir caixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: fechar caixa -->
+<div id="modal-fechar-caixa-overlay" class="modal-caixa-overlay">
+  <div class="modal-caixa-conteudo" style="max-width:460px;">
+    <h3>🔒 Fechar Caixa</h3>
+    <div class="modal-caixa-aviso" id="fechar-caixa-periodo"></div>
+
+    <div class="fechar-caixa-secao-label">Resumo do turno</div>
+    <div id="fechar-caixa-resumo-formas"></div>
+
+    <div class="fechar-caixa-secao-label">Conferência de caixa (dinheiro físico)</div>
+    <div id="fechar-caixa-conferencia"></div>
+
+    <div class="campo" style="margin-top:14px;">
+      <label>Quanto tem de verdade na gaveta agora?</label>
+      <input type="text" inputmode="decimal" id="input-fechar-caixa-contado" placeholder="0,00" oninput="atualizarDiferencaFechamento()">
+    </div>
+
+    <div id="fechar-caixa-diferenca" style="display:none;"></div>
+
+    <div class="modal-botoes">
+      <button class="btn-ghost" onclick="fecharModalFecharCaixa()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarFechamentoCaixa()">Fechar caixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: histórico de turnos de caixa -->
+<div id="modal-historico-caixa-overlay" class="modal-caixa-overlay">
+  <div class="modal-caixa-conteudo" style="max-width:460px;">
+    <button class="modal-fechar" onclick="fecharHistoricoCaixa()">✕</button>
+    <h3>Turnos anteriores</h3>
+    <div id="lista-historico-caixa"><div class="aviso-vazio-pequeno">Carregando...</div></div>
   </div>
 </div>
 
