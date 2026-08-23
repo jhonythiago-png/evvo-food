@@ -311,7 +311,10 @@ function abrirModalItem(itemId) {
   document.getElementById('input-item-categoria').value = item?.categoria_id || (estado.categorias[0]?.id || '');
   document.getElementById('input-item-tipo').value = item?.tipo_montagem || 'fixo';
   document.getElementById('input-item-qtd-sabores').value = item?.qtd_sabores_inclusos || '';
-  document.getElementById('input-item-preco-terceiro-sabor').value = item?.preco_terceiro_sabor ? String(item.preco_terceiro_sabor).replace('.', ',') : '';
+  // Mostra o valor TOTAL com 3 sabores (preço base + o degrau), não a
+  // diferença crua — é mais intuitivo pra editar depois
+  const totalTresSabores = item ? Number(item.preco_base) + Number(item.preco_terceiro_sabor || 0) : null;
+  document.getElementById('input-item-preco-terceiro-sabor').value = totalTresSabores ? String(totalTresSabores.toFixed(2)).replace('.', ',') : '';
   document.getElementById('input-item-destaque').checked = item?.destaque || false;
   document.getElementById('input-item-disponivel').checked = item ? item.disponivel : true;
 
@@ -461,7 +464,14 @@ async function salvarItem() {
 
   const precisaQtdSabores = tipoMontagem === 'monte_sabores' || tipoMontagem === 'escolha_um';
   const qtdSabores = precisaQtdSabores ? (parseInt(qtdSaboresTexto) || 1) : null;
-  const precoTerceiroSabor = tipoMontagem === 'monte_sabores' ? (parseFloat(precoTerceiroSaborTexto.replace(',', '.')) || 0) : 0;
+
+  // O campo pede o preço TOTAL com 3 sabores — aqui calculamos sozinhos
+  // a diferença em relação ao preço base, que é o que fica salvo de fato
+  let precoTerceiroSabor = 0;
+  if (tipoMontagem === 'monte_sabores' && precoTerceiroSaborTexto) {
+    const totalTresSabores = parseFloat(precoTerceiroSaborTexto.replace(',', '.')) || 0;
+    precoTerceiroSabor = Math.max(0, totalTresSabores - preco);
+  }
 
   const dadosItem = {
     estabelecimento_id: estado.perfil.estabelecimento_id,
