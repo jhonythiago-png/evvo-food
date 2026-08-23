@@ -71,6 +71,15 @@
 
 <script src="js/supabase-client.js"></script>
 <script>
+// Registra o Service Worker (necessário pro Android tratar a instalação
+// como um app completo, não um atalho reduzido) — feito aqui também porque
+// essa é a primeira tela que a pessoa abre, antes mesmo de logar
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((erro) => {
+    console.log('Service Worker não registrado:', erro);
+  });
+}
+
 const form = document.getElementById('form-login');
 const btnEntrar = document.getElementById('btn-entrar');
 const mensagemErro = document.getElementById('mensagem-erro');

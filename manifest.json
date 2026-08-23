@@ -1,8 +1,10 @@
 {
+  "id": ".",
   "name": "Evvo Food",
   "short_name": "Evvo Food",
   "description": "A evolução no comando do seu negócio.",
   "start_url": "atendente.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#17140F",
