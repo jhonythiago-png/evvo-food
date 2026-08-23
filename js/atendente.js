@@ -435,7 +435,10 @@ function renderChipSabor(itemIngrediente, unico = false) {
   const selecionado = estado.selecaoSabores.includes(id);
   const item = estado.itemEmEdicao;
   const posicao = estado.selecaoSabores.indexOf(id);
-  const foiAcrescimo = selecionado && !unico && posicao >= item.qtd_sabores_inclusos;
+  // Só é "acréscimo de verdade" (vermelho) quando passa do 3º sabor —
+  // o 3º em si (posição == cota) é o degrau especial, mas continua
+  // sendo tratado como sabor normal (verde), não como acréscimo
+  const foiAcrescimo = selecionado && !unico && posicao > item.qtd_sabores_inclusos;
 
   let classe = 'chip';
   let sufixo = '';
@@ -458,11 +461,22 @@ function alternarRemocao(ingredienteId) {
 
 function renderChipAcrescimo(itemIngrediente) {
   const id = itemIngrediente.ingredientes.id;
-  const marcado = estado.acrescimosSelecionados.includes(id);
+  const posicao = estado.acrescimosSelecionados.indexOf(id);
+  const marcado = posicao >= 0;
+
+  // Cada ingrediente removido libera 1 vaga de substituição grátis —
+  // as primeiras marcações preenchem essa vaga (chip fica verde, sem
+  // custo), só o que passar disso é acréscimo de verdade (chip vermelho)
+  const vagasGratis = estado.ingredientesRemovidos.length;
+  const ehSubstituicaoGratis = marcado && posicao < vagasGratis;
+
   const preco = itemIngrediente.preco_acrescimo.toFixed(2).replace('.', ',');
+  const classeExtra = marcado ? (ehSubstituicaoGratis ? 'on' : 'extra') : '';
+  const rotuloPreco = ehSubstituicaoGratis ? 'grátis' : `+R$${preco}`;
+
   return `
-    <button class="chip ${marcado ? 'extra' : ''}" onclick="alternarAcrescimo('${id}')">
-      ${itemIngrediente.ingredientes.nome} +R$${preco}
+    <button class="chip ${classeExtra}" onclick="alternarAcrescimo('${id}')">
+      ${itemIngrediente.ingredientes.nome} ${marcado ? rotuloPreco : `+R$${preco}`}
     </button>
   `;
 }
