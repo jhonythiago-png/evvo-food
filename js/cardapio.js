@@ -239,7 +239,7 @@ async function excluirIngrediente() {
 async function carregarItens() {
   const { data, error } = await supabaseClient
     .from('itens_cardapio')
-    .select('id, nome, descricao, preco_base, tipo_montagem, qtd_sabores_inclusos, destaque, disponivel, ordem_exibicao, categoria_id, categorias_cardapio(nome, ordem_exibicao)')
+    .select('id, nome, descricao, preco_base, tipo_montagem, qtd_sabores_inclusos, preco_terceiro_sabor, destaque, disponivel, ordem_exibicao, categoria_id, categorias_cardapio(nome, ordem_exibicao)')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
     .order('ordem_exibicao');
 
@@ -311,6 +311,7 @@ function abrirModalItem(itemId) {
   document.getElementById('input-item-categoria').value = item?.categoria_id || (estado.categorias[0]?.id || '');
   document.getElementById('input-item-tipo').value = item?.tipo_montagem || 'fixo';
   document.getElementById('input-item-qtd-sabores').value = item?.qtd_sabores_inclusos || '';
+  document.getElementById('input-item-preco-terceiro-sabor').value = item?.preco_terceiro_sabor ? String(item.preco_terceiro_sabor).replace('.', ',') : '';
   document.getElementById('input-item-destaque').checked = item?.destaque || false;
   document.getElementById('input-item-disponivel').checked = item ? item.disponivel : true;
 
@@ -349,6 +350,10 @@ function atualizarVisibilidadeQtdSabores() {
   const precisa = tipo === 'monte_sabores' || tipo === 'escolha_um';
   document.getElementById('campo-qtd-sabores').style.display = precisa ? 'block' : 'none';
   if (tipo === 'escolha_um') document.getElementById('input-item-qtd-sabores').value = 1;
+
+  // O "degrau do 3º sabor" só faz sentido pro Monte-sabores — Escolha 1
+  // não tem essa lógica de cota subindo aos poucos
+  document.getElementById('campo-preco-terceiro-sabor').style.display = tipo === 'monte_sabores' ? 'block' : 'none';
 
   renderSecaoIngredientesModal();
 }
@@ -443,6 +448,7 @@ async function salvarItem() {
   const categoriaId = document.getElementById('input-item-categoria').value;
   const tipoMontagem = document.getElementById('input-item-tipo').value;
   const qtdSaboresTexto = document.getElementById('input-item-qtd-sabores').value;
+  const precoTerceiroSaborTexto = document.getElementById('input-item-preco-terceiro-sabor').value;
   const destaque = document.getElementById('input-item-destaque').checked;
   const disponivel = document.getElementById('input-item-disponivel').checked;
 
@@ -455,6 +461,7 @@ async function salvarItem() {
 
   const precisaQtdSabores = tipoMontagem === 'monte_sabores' || tipoMontagem === 'escolha_um';
   const qtdSabores = precisaQtdSabores ? (parseInt(qtdSaboresTexto) || 1) : null;
+  const precoTerceiroSabor = tipoMontagem === 'monte_sabores' ? (parseFloat(precoTerceiroSaborTexto.replace(',', '.')) || 0) : 0;
 
   const dadosItem = {
     estabelecimento_id: estado.perfil.estabelecimento_id,
@@ -464,6 +471,7 @@ async function salvarItem() {
     preco_base: preco,
     tipo_montagem: tipoMontagem,
     qtd_sabores_inclusos: qtdSabores,
+    preco_terceiro_sabor: precoTerceiroSabor,
     destaque,
     disponivel,
   };

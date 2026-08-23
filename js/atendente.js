@@ -490,8 +490,13 @@ function atualizarTotalModal() {
   let total = item.preco_base;
 
   if (item.tipo_montagem === 'monte_sabores') {
+    // Degrau especial: o sabor EXATAMENTE na posição da cota (o 3º, se a
+    // cota for 2) cobra um valor fixo próprio — diferente do acréscimo
+    // "normal" que se aplica só do 4º sabor em diante
     estado.selecaoSabores.forEach((id, pos) => {
-      if (pos >= item.qtd_sabores_inclusos) {
+      if (pos === item.qtd_sabores_inclusos) {
+        total += Number(item.preco_terceiro_sabor || 0);
+      } else if (pos > item.qtd_sabores_inclusos) {
         const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
         if (ii) total += ii.preco_acrescimo;
       }
@@ -499,9 +504,14 @@ function atualizarTotalModal() {
   }
 
   if (item.tipo_montagem === 'fixo') {
-    estado.acrescimosSelecionados.forEach(id => {
-      const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
-      if (ii) total += ii.preco_acrescimo;
+    // Cada ingrediente padrão removido libera 1 "vaga" de substituição
+    // grátis — só o que passar dessas vagas é cobrado de verdade
+    const vagasGratis = estado.ingredientesRemovidos.length;
+    estado.acrescimosSelecionados.forEach((id, index) => {
+      if (index >= vagasGratis) {
+        const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
+        if (ii) total += ii.preco_acrescimo;
+      }
     });
   }
 
@@ -513,6 +523,7 @@ function confirmarAdicaoAoCarrinho() {
   let precoUnitario = item.preco_base;
   let observacao = null;
   let sabores = [];
+  let nomeExibicao = item.nome;
 
   const obsExtra = (estado.observacaoAtual || '').trim();
 
@@ -525,11 +536,21 @@ function confirmarAdicaoAoCarrinho() {
     if (obsExtra) partes.push(obsExtra);
     observacao = partes.length ? partes.join(' — ') : null;
 
-    // Acréscimos pagos escolhidos (ex: bacon extra no Frango Especial)
-    sabores = estado.acrescimosSelecionados.map(id => {
+    // Cada ingrediente removido libera 1 vaga de substituição grátis —
+    // as primeiras adições preenchem essas vagas (sem custo), só o que
+    // sobrar depois disso é cobrado como acréscimo de verdade
+    const vagasGratis = nomesRemovidos.length;
+    sabores = estado.acrescimosSelecionados.map((id, index) => {
       const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
-      precoUnitario += ii.preco_acrescimo;
-      return { id, nome: `+ ${ii.ingredientes.nome}`, foiAcrescimo: true, precoAcrescimo: ii.preco_acrescimo };
+      const ehSubstituicao = index < vagasGratis;
+      if (!ehSubstituicao) precoUnitario += ii.preco_acrescimo;
+      return {
+        id,
+        nome: ehSubstituicao ? `Substituído por ${ii.ingredientes.nome}` : `+ ${ii.ingredientes.nome}`,
+        foiAcrescimo: !ehSubstituicao,
+        foiSubstituicao: ehSubstituicao,
+        precoAcrescimo: ehSubstituicao ? 0 : ii.preco_acrescimo,
+      };
     });
 
   } else if (item.tipo_montagem === 'monte_sabores') {
@@ -539,11 +560,26 @@ function confirmarAdicaoAoCarrinho() {
     }
     sabores = estado.selecaoSabores.map((id, pos) => {
       const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
-      const foiAcrescimo = pos >= item.qtd_sabores_inclusos;
-      if (foiAcrescimo) precoUnitario += ii.preco_acrescimo;
-      return { id, nome: ii.ingredientes.nome, foiAcrescimo, precoAcrescimo: foiAcrescimo ? ii.preco_acrescimo : 0 };
+      if (pos === item.qtd_sabores_inclusos) {
+        // É exatamente o sabor do "degrau" (ex: o 3º, numa cota de 2) —
+        // cobra o valor fixo próprio dele, mas continua aparecendo como
+        // sabor normal no cupom (não é tratado como "acréscimo")
+        precoUnitario += Number(item.preco_terceiro_sabor || 0);
+        return { id, nome: ii.ingredientes.nome, foiAcrescimo: false, foiSubstituicao: false, precoAcrescimo: Number(item.preco_terceiro_sabor || 0) };
+      }
+      if (pos > item.qtd_sabores_inclusos) {
+        // Além do degrau (ex: o 4º sabor) — aí sim é acréscimo de verdade
+        precoUnitario += ii.preco_acrescimo;
+        return { id, nome: ii.ingredientes.nome, foiAcrescimo: true, foiSubstituicao: false, precoAcrescimo: ii.preco_acrescimo };
+      }
+      return { id, nome: ii.ingredientes.nome, foiAcrescimo: false, foiSubstituicao: false, precoAcrescimo: 0 };
     });
     observacao = obsExtra || null;
+
+    // Nome dinâmico: "— 2 sabores" ou "— 3 sabores" (trava em 3, mesmo
+    // que a pessoa escolha um 4º — esse 4º vira só um acréscimo à parte)
+    const qtdParaNome = Math.min(estado.selecaoSabores.length, item.qtd_sabores_inclusos + 1);
+    nomeExibicao = `${item.nome} — ${qtdParaNome} sabores`;
 
   } else if (item.tipo_montagem === 'escolha_um') {
     if (estado.selecaoSabores.length === 0) {
@@ -552,7 +588,7 @@ function confirmarAdicaoAoCarrinho() {
     }
     const id = estado.selecaoSabores[0];
     const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
-    sabores = [{ id, nome: ii.ingredientes.nome, foiAcrescimo: false, precoAcrescimo: 0 }];
+    sabores = [{ id, nome: ii.ingredientes.nome, foiAcrescimo: false, foiSubstituicao: false, precoAcrescimo: 0 }];
     observacao = obsExtra || null;
 
   } else {
@@ -560,7 +596,7 @@ function confirmarAdicaoAoCarrinho() {
     observacao = obsExtra || null;
   }
 
-  adicionarAoCarrinho({ item, precoUnitario, observacao, sabores });
+  adicionarAoCarrinho({ item, nomeExibicao, precoUnitario, observacao, sabores });
   fecharModal();
 }
 
@@ -599,7 +635,7 @@ function renderCarrinho() {
     lista.innerHTML = estado.carrinho.map((l, i) => `
       <div class="carrinho-linha">
         <div>
-          <div class="carrinho-linha-nome">${l.quantidade}× ${escapeHtml(l.item.nome)}</div>
+          <div class="carrinho-linha-nome">${l.quantidade}× ${escapeHtml(l.nomeExibicao || l.item.nome)}</div>
           ${l.sabores.length ? `<div class="carrinho-linha-obs">${l.sabores.map(s => escapeHtml(s.nome)).join(', ')}</div>` : ''}
           ${l.observacao ? `<div class="carrinho-linha-obs">${escapeHtml(l.observacao)}</div>` : ''}
         </div>
@@ -670,6 +706,7 @@ async function enviarPedido() {
           pedido_item_id: pedidoItem.id,
           ingrediente_id: s.id,
           foi_acrescimo: s.foiAcrescimo,
+          foi_substituicao: s.foiSubstituicao || false,
           preco_acrescimo_aplicado: s.precoAcrescimo,
         }));
         const { error: erroSabores } = await supabaseClient
@@ -723,8 +760,8 @@ async function abrirPedidosEnviados() {
       .from('pedido_itens')
       .select(`
         id, quantidade, preco_unitario_calculado, observacao, status, criado_em,
-        itens_cardapio ( nome ),
-        pedido_item_ingredientes ( foi_acrescimo, ingredientes ( nome ) )
+        itens_cardapio ( nome, tipo_montagem ),
+        pedido_item_ingredientes ( foi_acrescimo, foi_substituicao, ingredientes ( nome ) )
       `)
       .eq('comanda_id', estado.comandaAtual.id)
       .neq('status', 'cancelado')
@@ -759,17 +796,30 @@ async function abrirPedidosEnviados() {
   }
 
   const htmlItens = (itens || []).map(pi => {
-    const sabores = pi.pedido_item_ingredientes.map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const saboresNormais = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo && !s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const substituicoes = pi.pedido_item_ingredientes.filter(s => s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const acrescimos = pi.pedido_item_ingredientes.filter(s => s.foi_acrescimo).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+
+    // Nome dinâmico pro Monte-sabores: "— 2 sabores" ou "— 3 sabores",
+    // igual à regra usada na hora de montar o carrinho
+    let nomeItem = pi.itens_cardapio.nome;
+    if (pi.itens_cardapio.tipo_montagem === 'monte_sabores') {
+      const qtdParaNome = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo).length;
+      nomeItem = `${nomeItem} — ${qtdParaNome} sabores`;
+    }
+
     const horario = new Date(pi.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     // Só permite cancelar se ainda não foi entregue (ainda dá tempo de avisar a cozinha)
     const podeCancel = pi.status === 'enviado' || pi.status === 'impresso';
     return `
       <div class="pedido-enviado-linha">
         <div class="linha-topo">
-          <span>${pi.quantidade}× ${escapeHtml(pi.itens_cardapio.nome)}</span>
+          <span>${pi.quantidade}× ${escapeHtml(nomeItem)}</span>
           <span>R$ ${(pi.preco_unitario_calculado * pi.quantidade).toFixed(2).replace('.', ',')}</span>
         </div>
-        ${sabores ? `<div class="linha-detalhe">${sabores}</div>` : ''}
+        ${saboresNormais ? `<div class="linha-detalhe">${saboresNormais}</div>` : ''}
+        ${substituicoes ? `<div class="linha-detalhe">Substituído por: ${substituicoes}</div>` : ''}
+        ${acrescimos ? `<div class="linha-detalhe">+ ACRÉSCIMO: ${acrescimos}</div>` : ''}
         ${pi.observacao ? `<div class="linha-detalhe">${escapeHtml(pi.observacao)}</div>` : ''}
         <div class="linha-detalhe">${horario}</div>
         <span class="linha-status">${pi.status}</span>
