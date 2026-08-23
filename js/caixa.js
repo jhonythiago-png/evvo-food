@@ -12,6 +12,8 @@ const estado = {
   pagamentos: [],               // [{ forma, valor }]
   historico: [],
   periodoHistorico: 'hoje',
+  caixaAtual: null,             // turno de caixa aberto agora (ou null se fechado)
+  historicoCaixas: [],
 };
 
 // ------------------------------------------------------------
@@ -31,6 +33,7 @@ async function iniciar() {
   estado.estabelecimento = estab;
 
   await carregarComandas();
+  await carregarStatusCaixa();
   escutarMudancas();
   setInterval(carregarComandas, 5000); // rede de segurança, igual no atendente
 }
@@ -814,6 +817,318 @@ async function confirmarFechamento() {
     btn.disabled = false;
     btn.textContent = ehSaidaEntrega ? 'Confirmar saída pra entrega' : 'Fechar conta';
   }
+}
+
+// ============================================================
+// Abertura e Fechamento de Caixa (turno)
+// ============================================================
+
+const NOMES_FORMA_PAGAMENTO_CAIXA = { dinheiro: 'Dinheiro', debito: 'Cartão Débito', credito: 'Cartão Crédito', pix: 'Pix' };
+
+async function carregarStatusCaixa() {
+  const { data, error } = await supabaseClient
+    .from('caixas_turno')
+    .select('id, status, aberto_em, valor_abertura, aberto_por')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .eq('status', 'aberto')
+    .order('aberto_em', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) { console.error(error); return; }
+
+  estado.caixaAtual = data || null;
+  renderStatusCaixa();
+}
+
+function renderStatusCaixa() {
+  const badge = document.getElementById('caixa-status-badge');
+  const detalhe = document.getElementById('caixa-status-detalhe');
+  const btnAcao = document.getElementById('btn-caixa-acao');
+
+  if (estado.caixaAtual) {
+    badge.textContent = '🔓 Caixa aberto';
+    badge.className = 'caixa-status-badge aberto';
+    const horario = new Date(estado.caixaAtual.aberto_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    detalhe.textContent = `desde ${horario} · troco inicial R$ ${Number(estado.caixaAtual.valor_abertura).toFixed(2).replace('.', ',')}`;
+    btnAcao.textContent = '🔒 Fechar Caixa';
+    btnAcao.style.display = 'block';
+  } else {
+    badge.textContent = '🔒 Caixa fechado';
+    badge.className = 'caixa-status-badge fechado';
+    detalhe.textContent = 'abre o caixa pra começar a operar o turno';
+    btnAcao.textContent = '🔓 Abrir Caixa';
+    btnAcao.style.display = 'block';
+  }
+}
+
+function cliqueBotaoCaixa() {
+  if (estado.caixaAtual) {
+    abrirModalFecharCaixa();
+  } else {
+    abrirModalAbrirCaixa();
+  }
+}
+
+// ------------------------------------------------------------
+// Abrir caixa
+// ------------------------------------------------------------
+function abrirModalAbrirCaixa() {
+  document.getElementById('input-abrir-caixa-valor').value = '';
+  document.getElementById('modal-abrir-caixa-overlay').style.display = 'flex';
+}
+
+function fecharModalAbrirCaixa() {
+  document.getElementById('modal-abrir-caixa-overlay').style.display = 'none';
+}
+
+async function confirmarAberturaCaixa() {
+  const valorTexto = document.getElementById('input-abrir-caixa-valor').value;
+  const valor = parseFloat((valorTexto || '0').replace(',', '.')) || 0;
+
+  const { error } = await supabaseClient.from('caixas_turno').insert({
+    estabelecimento_id: estado.perfil.estabelecimento_id,
+    aberto_por: estado.perfil.id,
+    valor_abertura: valor,
+    status: 'aberto',
+  });
+
+  if (error) {
+    mostrarToast('Erro ao abrir caixa.', 'erro');
+    console.error(error);
+    return;
+  }
+
+  mostrarToast('Caixa aberto! 🔓');
+  fecharModalAbrirCaixa();
+  await carregarStatusCaixa();
+}
+
+// ------------------------------------------------------------
+// Fechar caixa — a parte que calcula tudo
+// ------------------------------------------------------------
+async function abrirModalFecharCaixa() {
+  if (!estado.caixaAtual) return;
+
+  document.getElementById('input-fechar-caixa-contado').value = '';
+  document.getElementById('fechar-caixa-diferenca').style.display = 'none';
+  document.getElementById('fechar-caixa-resumo-formas').innerHTML = '<div class="aviso-vazio-pequeno">Calculando...</div>';
+  document.getElementById('fechar-caixa-conferencia').innerHTML = '';
+  document.getElementById('modal-fechar-caixa-overlay').style.display = 'flex';
+
+  const inicio = estado.caixaAtual.aberto_em;
+  const fim = new Date().toISOString();
+
+  const inicioTexto = new Date(inicio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  document.getElementById('fechar-caixa-periodo').textContent = `Turno desde ${inicioTexto} até agora`;
+
+  // Busca todos os pagamentos de comandas fechadas nesse período
+  const { data: pagamentos, error } = await supabaseClient
+    .from('pagamentos')
+    .select(`
+      forma_pagamento, valor,
+      fechamentos!inner ( fechado_em, comandas!inner ( estabelecimento_id ) )
+    `)
+    .eq('fechamentos.comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('fechamentos.fechado_em', inicio)
+    .lte('fechamentos.fechado_em', fim);
+
+  if (error) {
+    console.error(error);
+    document.getElementById('fechar-caixa-resumo-formas').innerHTML = '<div class="aviso-vazio-pequeno">Erro ao calcular.</div>';
+    return;
+  }
+
+  const totaisPorForma = {};
+  for (const p of pagamentos || []) {
+    totaisPorForma[p.forma_pagamento] = (totaisPorForma[p.forma_pagamento] || 0) + Number(p.valor);
+  }
+
+  const totalGeral = Object.values(totaisPorForma).reduce((s, v) => s + v, 0);
+  const dinheiroRecebido = totaisPorForma['dinheiro'] || 0;
+
+  // Ajustes de caixa registrados durante o turno também entram na conferência
+  const { data: ajustes } = await supabaseClient
+    .from('ajustes_caixa')
+    .select('valor')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('criado_em', inicio)
+    .lte('criado_em', fim);
+
+  const somaAjustes = (ajustes || []).reduce((s, a) => s + Number(a.valor), 0);
+
+  const valorEsperado = Number(estado.caixaAtual.valor_abertura) + dinheiroRecebido + somaAjustes;
+
+  // Guarda esses valores calculados no estado, pra usar quando confirmar o fechamento
+  estado.caixaAtual._calculo = { totaisPorForma, totalGeral, dinheiroRecebido, somaAjustes, valorEsperado };
+
+  document.getElementById('fechar-caixa-resumo-formas').innerHTML = `
+    ${Object.entries(totaisPorForma).map(([forma, valor]) => `
+      <div class="fechar-caixa-linha">
+        <span>${NOMES_FORMA_PAGAMENTO_CAIXA[forma] || forma}</span>
+        <span>R$ ${valor.toFixed(2).replace('.', ',')}</span>
+      </div>
+    `).join('') || '<div class="aviso-vazio-pequeno">Nenhum pagamento registrado nesse turno.</div>'}
+    <div class="fechar-caixa-linha total">
+      <span>Total recebido no turno</span>
+      <span>R$ ${totalGeral.toFixed(2).replace('.', ',')}</span>
+    </div>
+  `;
+
+  document.getElementById('fechar-caixa-conferencia').innerHTML = `
+    <div class="fechar-caixa-linha">
+      <span>Troco inicial (abertura)</span>
+      <span>R$ ${Number(estado.caixaAtual.valor_abertura).toFixed(2).replace('.', ',')}</span>
+    </div>
+    <div class="fechar-caixa-linha">
+      <span>+ Dinheiro recebido no turno</span>
+      <span>R$ ${dinheiroRecebido.toFixed(2).replace('.', ',')}</span>
+    </div>
+    <div class="fechar-caixa-linha">
+      <span>+ Ajustes de caixa</span>
+      <span>R$ ${somaAjustes.toFixed(2).replace('.', ',')}</span>
+    </div>
+    <div class="fechar-caixa-linha esperado">
+      <span>= Esperado na gaveta</span>
+      <span>R$ ${valorEsperado.toFixed(2).replace('.', ',')}</span>
+    </div>
+  `;
+}
+
+function fecharModalFecharCaixa() {
+  document.getElementById('modal-fechar-caixa-overlay').style.display = 'none';
+}
+
+function atualizarDiferencaFechamento() {
+  if (!estado.caixaAtual?._calculo) return;
+
+  const contadoTexto = document.getElementById('input-fechar-caixa-contado').value;
+  const elDiferenca = document.getElementById('fechar-caixa-diferenca');
+
+  if (!contadoTexto) {
+    elDiferenca.style.display = 'none';
+    return;
+  }
+
+  const contado = parseFloat(contadoTexto.replace(',', '.')) || 0;
+  const diferenca = round2(contado - estado.caixaAtual._calculo.valorEsperado);
+
+  elDiferenca.style.display = 'block';
+  if (Math.abs(diferenca) < 0.01) {
+    elDiferenca.className = 'bateu';
+    elDiferenca.textContent = '✅ Bateu certinho!';
+  } else if (diferenca < 0) {
+    elDiferenca.className = 'faltando';
+    elDiferenca.textContent = `⚠️ Faltando R$ ${Math.abs(diferenca).toFixed(2).replace('.', ',')}`;
+  } else {
+    elDiferenca.className = 'sobrando';
+    elDiferenca.textContent = `💰 Sobrando R$ ${diferenca.toFixed(2).replace('.', ',')}`;
+  }
+}
+
+async function confirmarFechamentoCaixa() {
+  if (!estado.caixaAtual?._calculo) return;
+
+  const contadoTexto = document.getElementById('input-fechar-caixa-contado').value;
+  if (!contadoTexto) {
+    mostrarToast('Digita quanto tem na gaveta pra confirmar.', 'erro');
+    return;
+  }
+
+  const contado = parseFloat(contadoTexto.replace(',', '.')) || 0;
+  const { valorEsperado } = estado.caixaAtual._calculo;
+  const diferenca = round2(contado - valorEsperado);
+
+  const { error } = await supabaseClient
+    .from('caixas_turno')
+    .update({
+      status: 'fechado',
+      fechado_por: estado.perfil.id,
+      fechado_em: new Date().toISOString(),
+      valor_contado: contado,
+      valor_esperado: valorEsperado,
+      diferenca,
+    })
+    .eq('id', estado.caixaAtual.id);
+
+  if (error) {
+    mostrarToast('Erro ao fechar caixa.', 'erro');
+    console.error(error);
+    return;
+  }
+
+  mostrarToast('Caixa fechado! 🔒');
+  fecharModalFecharCaixa();
+  await carregarStatusCaixa();
+}
+
+// ------------------------------------------------------------
+// Histórico de turnos de caixa
+// ------------------------------------------------------------
+async function abrirHistoricoCaixa() {
+  document.getElementById('modal-historico-caixa-overlay').style.display = 'flex';
+  document.getElementById('lista-historico-caixa').innerHTML = '<div class="aviso-vazio-pequeno">Carregando...</div>';
+
+  const { data, error } = await supabaseClient
+    .from('caixas_turno')
+    .select('id, status, aberto_em, valor_abertura, fechado_em, valor_contado, valor_esperado, diferenca')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .order('aberto_em', { ascending: false })
+    .limit(30);
+
+  if (error) {
+    console.error(error);
+    document.getElementById('lista-historico-caixa').innerHTML = '<div class="aviso-vazio-pequeno">Erro ao carregar.</div>';
+    return;
+  }
+
+  estado.historicoCaixas = data || [];
+  renderHistoricoCaixa();
+}
+
+function fecharHistoricoCaixa() {
+  document.getElementById('modal-historico-caixa-overlay').style.display = 'none';
+}
+
+function renderHistoricoCaixa() {
+  const container = document.getElementById('lista-historico-caixa');
+
+  if (estado.historicoCaixas.length === 0) {
+    container.innerHTML = '<div class="aviso-vazio-pequeno">Nenhum turno registrado ainda.</div>';
+    return;
+  }
+
+  container.innerHTML = estado.historicoCaixas.map(c => {
+    const dataAbertura = new Date(c.aberto_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    if (c.status === 'aberto') {
+      return `
+        <div class="caixa-turno-linha">
+          <div class="caixa-turno-topo"><span>🔓 Em andamento</span></div>
+          <div class="caixa-turno-detalhe">Aberto em ${dataAbertura} · troco inicial R$ ${Number(c.valor_abertura).toFixed(2).replace('.', ',')}</div>
+        </div>
+      `;
+    }
+
+    const dataFechamento = new Date(c.fechado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const dif = Number(c.diferenca);
+    const classeDif = Math.abs(dif) < 0.01 ? 'bateu' : (dif < 0 ? 'faltando' : 'sobrando');
+    const textoDif = Math.abs(dif) < 0.01
+      ? '✅ Bateu certinho'
+      : (dif < 0 ? `⚠️ Faltou R$ ${Math.abs(dif).toFixed(2).replace('.', ',')}` : `💰 Sobrou R$ ${dif.toFixed(2).replace('.', ',')}`);
+
+    return `
+      <div class="caixa-turno-linha">
+        <div class="caixa-turno-topo">
+          <span>${dataAbertura} → ${dataFechamento}</span>
+        </div>
+        <div class="caixa-turno-detalhe">
+          Esperado R$ ${Number(c.valor_esperado).toFixed(2).replace('.', ',')} · Contado R$ ${Number(c.valor_contado).toFixed(2).replace('.', ',')}
+        </div>
+        <div class="caixa-turno-dif ${classeDif}">${textoDif}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 iniciar();
