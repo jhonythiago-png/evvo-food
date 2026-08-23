@@ -260,3 +260,11 @@ function injetarNavegacao(perfil, paginaAtual) {
     </div>
   `;
 }
+
+// Registra o Service Worker (uma vez por página) — necessário pro Android
+// tratar a instalação como um app completo, não um atalho reduzido
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((erro) => {
+    console.log('Service Worker não registrado:', erro);
+  });
+}
