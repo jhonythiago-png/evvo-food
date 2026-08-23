@@ -131,7 +131,7 @@ async function carregarCardapio() {
     .select(`
       id, nome, ordem_exibicao,
       itens_cardapio (
-        id, nome, descricao, preco_base, tipo_montagem, qtd_sabores_inclusos, destaque, disponivel, ordem_exibicao,
+        id, nome, descricao, preco_base, tipo_montagem, qtd_sabores_inclusos, preco_terceiro_sabor, destaque, disponivel, ordem_exibicao,
         item_ingredientes ( id, papel, preco_acrescimo, ingredientes ( id, nome ) )
       )
     `)
