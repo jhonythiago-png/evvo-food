@@ -201,7 +201,7 @@ function encontrarItem(itemId) {
 async function carregarComandasAbertas() {
   const { data, error } = await supabaseClient
     .from('comandas')
-    .select('id, numero_sequencial, tipo, numero_mesa, nome_cliente, identificador_pessoa')
+    .select('id, numero_sequencial, tipo, numero_mesa, nome_cliente, identificador_pessoa, aberta_por, perfis(nome)')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
     .eq('status', 'aberta')
     .order('aberta_em', { ascending: false });
@@ -218,6 +218,7 @@ async function carregarComandasAbertas() {
     <button class="comanda-card" onclick="selecionarComanda('${c.id}')">
       <span class="badge">${rotuloComanda(c)}</span>
       <span class="numero">#${c.numero_sequencial}</span>
+      ${c.perfis?.nome ? `<span class="comanda-atendente">Atendente: ${escapeHtml(c.perfis.nome)}</span>` : ''}
     </button>
   `).join('');
 }
