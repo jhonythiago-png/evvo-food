@@ -152,6 +152,12 @@
   .pedido-enviado-linha {
     border-bottom: 1px dashed var(--ink-line); padding: 10px 0; font-family: var(--font-mono); font-size: 12.5px;
   }
+  .leva-pedido { margin-bottom: 6px; }
+  .leva-cabecalho {
+    font-family: var(--font-mono); font-size: 11px; color: var(--crust); text-transform: uppercase;
+    letter-spacing: .03em; padding: 10px 0 4px; border-top: 1px solid var(--ink-line);
+  }
+  .leva-pedido:first-child .leva-cabecalho { border-top: none; padding-top: 0; }
   .pedido-enviado-linha .linha-topo { display: flex; justify-content: space-between; color: var(--text-primary); font-weight: 600; }
   .pedido-enviado-linha .linha-detalhe { color: var(--text-muted); margin-top: 3px; }
   .pedido-enviado-linha .linha-status {
