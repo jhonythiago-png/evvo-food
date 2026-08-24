@@ -141,6 +141,10 @@
     letter-spacing: .03em; margin: 18px 0 8px;
   }
   .fechar-caixa-secao-label:first-of-type { margin-top: 0; }
+  .btn-imprimir-conferencia-caixa {
+    width: 100%; margin-top: 12px; padding: 11px; border-radius: var(--radius-md);
+    background: var(--ink-line); color: var(--text-primary); font-size: 13px; font-weight: 600;
+  }
   .fechar-caixa-linha {
     display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;
   }
@@ -433,6 +437,9 @@
 
     <div class="fechar-caixa-secao-label">Conferência de caixa (dinheiro físico)</div>
     <div id="fechar-caixa-conferencia"></div>
+
+    <button class="btn-imprimir-conferencia-caixa" onclick="imprimirConferenciaCaixa()">🖨️ Imprimir conferência (não fecha ainda)</button>
+    <p class="modal-caixa-aviso" style="margin-top:8px; margin-bottom:0;">Imprime esse resumo pra você contar o dinheiro com o papel em mãos. Só fecha de verdade quando confirmar embaixo.</p>
 
     <div class="campo" style="margin-top:14px;">
       <label>Quanto tem de verdade na gaveta agora?</label>

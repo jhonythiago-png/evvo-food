@@ -113,6 +113,8 @@
   .despesa-status.pago { background: rgba(92,122,82,.18); color: #9CBF8F; }
   .despesa-status.pendente { background: rgba(214,67,42,.14); color: #F0A08D; }
   .btn-marcar-pago { font-size: 11px; color: var(--crust); text-decoration: underline; white-space: nowrap; }
+  .btn-editar-despesa { font-size: 11px; color: var(--text-muted); text-decoration: underline; white-space: nowrap; }
+  .btn-excluir-despesa { font-size: 11px; color: var(--paprika); text-decoration: underline; white-space: nowrap; }
 
   .btn-nova-despesa { padding: 9px 18px; width: auto; }
   .aviso-vazio-pequeno { color: var(--text-faint); font-size: 13px; padding: 4px 0; }
@@ -234,7 +236,7 @@
 <!-- MODAL: nova despesa -->
 <div id="modal-despesa-overlay">
   <div id="modal-despesa-conteudo">
-    <h3>Nova despesa</h3>
+    <h3 id="modal-despesa-titulo">Nova despesa</h3>
 
     <div class="campo">
       <label>Descrição</label>
@@ -298,6 +300,18 @@
     <div class="modal-botoes">
       <button class="btn-ghost" onclick="fecharModalSangria()">Cancelar</button>
       <button class="btn-primary" onclick="salvarSangria()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: confirmação genérica -->
+<div id="modal-confirmacao-generica-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:200; padding:20px;">
+  <div style="background:var(--ink); border-radius:var(--radius-lg); padding:22px; width:100%; max-width:380px;">
+    <h3 style="font-family:var(--font-display); margin-bottom:10px;">Confirmar</h3>
+    <p id="confirmacao-generica-texto" style="font-size:13px; color:var(--text-muted); margin-bottom:16px;"></p>
+    <div class="modal-botoes">
+      <button class="btn-ghost" onclick="fecharModalConfirmacaoGenerica()">Cancelar</button>
+      <button class="btn-danger" onclick="executarConfirmacaoGenerica()">Confirmar</button>
     </div>
   </div>
 </div>
