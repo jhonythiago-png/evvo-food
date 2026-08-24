@@ -476,6 +476,13 @@ function renderFechamento() {
 
   document.getElementById('valor-subtotal').textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
   document.getElementById('valor-taxa-servico').textContent = `R$ ${taxaValor.toFixed(2).replace('.', ',')}`;
+  const linhaTaxaEntrega = document.getElementById('linha-resumo-taxa-entrega');
+  if (estado.taxaEntregaValor > 0) {
+    linhaTaxaEntrega.style.display = 'flex';
+    document.getElementById('valor-taxa-entrega-resumo').textContent = `R$ ${Number(estado.taxaEntregaValor).toFixed(2).replace('.', ',')}`;
+  } else {
+    linhaTaxaEntrega.style.display = 'none';
+  }
   document.getElementById('valor-total').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
 
   // Se for comanda de entrega ainda não despachada, o botão final não "fecha"
@@ -650,6 +657,13 @@ function atualizarResumoValores() {
   const { subtotal, taxaValor, total } = calcularValores();
   document.getElementById('valor-subtotal').textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
   document.getElementById('valor-taxa-servico').textContent = `R$ ${taxaValor.toFixed(2).replace('.', ',')}`;
+  const linhaTaxaEntrega = document.getElementById('linha-resumo-taxa-entrega');
+  if (estado.taxaEntregaValor > 0) {
+    linhaTaxaEntrega.style.display = 'flex';
+    document.getElementById('valor-taxa-entrega-resumo').textContent = `R$ ${Number(estado.taxaEntregaValor).toFixed(2).replace('.', ',')}`;
+  } else {
+    linhaTaxaEntrega.style.display = 'none';
+  }
   document.getElementById('valor-total').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
   renderResumoPagamento();
 }
@@ -922,21 +936,37 @@ async function abrirModalFecharCaixa() {
   const inicioTexto = new Date(inicio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   document.getElementById('fechar-caixa-periodo').textContent = `Turno desde ${inicioTexto} até agora`;
 
-  // Busca todos os pagamentos de comandas fechadas nesse período
-  const { data: pagamentos, error } = await supabaseClient
-    .from('pagamentos')
-    .select(`
-      forma_pagamento, valor,
-      fechamentos!inner ( fechado_em, comandas!inner ( estabelecimento_id ) )
-    `)
-    .eq('fechamentos.comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
-    .gte('fechamentos.fechado_em', inicio)
-    .lte('fechamentos.fechado_em', fim);
+  // Busca todos os pagamentos de comandas fechadas nesse período — em 2 passos
+  // simples, pra evitar filtro em consulta aninhada de 2 níveis (que o
+  // Supabase não processa direito e causava erro)
+  const { data: fechamentosNoTurno, error: erroFechamentos } = await supabaseClient
+    .from('fechamentos')
+    .select('id, comandas!inner(estabelecimento_id)')
+    .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('fechado_em', inicio)
+    .lte('fechado_em', fim);
 
-  if (error) {
-    console.error(error);
+  if (erroFechamentos) {
+    console.error(erroFechamentos);
     document.getElementById('fechar-caixa-resumo-formas').innerHTML = '<div class="aviso-vazio-pequeno">Erro ao calcular.</div>';
     return;
+  }
+
+  const idsFechamentos = (fechamentosNoTurno || []).map(f => f.id);
+
+  let pagamentos = [];
+  if (idsFechamentos.length > 0) {
+    const { data, error } = await supabaseClient
+      .from('pagamentos')
+      .select('forma_pagamento, valor')
+      .in('fechamento_id', idsFechamentos);
+
+    if (error) {
+      console.error(error);
+      document.getElementById('fechar-caixa-resumo-formas').innerHTML = '<div class="aviso-vazio-pequeno">Erro ao calcular.</div>';
+      return;
+    }
+    pagamentos = data || [];
   }
 
   const totaisPorForma = {};

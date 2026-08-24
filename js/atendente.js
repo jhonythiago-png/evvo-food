@@ -832,9 +832,9 @@ async function abrirPedidosEnviados() {
           <span>R$ ${(pi.preco_unitario_calculado * pi.quantidade).toFixed(2).replace('.', ',')}</span>
         </div>
         ${saboresNormais ? `<div class="linha-detalhe">${saboresNormais}</div>` : ''}
+        ${pi.observacao ? `<div class="linha-detalhe">${escapeHtml(pi.observacao)}</div>` : ''}
         ${substituicoes ? `<div class="linha-detalhe">Substituído por: ${substituicoes}</div>` : ''}
         ${acrescimos ? `<div class="linha-detalhe">+ ACRÉSCIMO: ${acrescimos}</div>` : ''}
-        ${pi.observacao ? `<div class="linha-detalhe">${escapeHtml(pi.observacao)}</div>` : ''}
         <div class="linha-detalhe">${horario}</div>
         <span class="linha-status">${pi.status}</span>
         ${podeCancel ? `<button class="btn-cancelar-item" onclick="cancelarItemEnviado('${pi.id}')">Cancelar item</button>` : ''}
