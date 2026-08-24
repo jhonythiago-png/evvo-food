@@ -774,7 +774,8 @@ async function abrirPedidosEnviados() {
     supabaseClient
       .from('pedido_itens')
       .select(`
-        id, quantidade, preco_unitario_calculado, observacao, status, criado_em,
+        id, quantidade, preco_unitario_calculado, observacao, status, criado_em, criado_por,
+        perfis ( nome ),
         itens_cardapio ( nome, tipo_montagem ),
         pedido_item_ingredientes ( foi_acrescimo, foi_substituicao, ingredientes ( nome ) )
       `)
@@ -810,35 +811,45 @@ async function abrirPedidosEnviados() {
     return;
   }
 
-  const htmlItens = (itens || []).map(pi => {
-    const saboresNormais = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo && !s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
-    const substituicoes = pi.pedido_item_ingredientes.filter(s => s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
-    const acrescimos = pi.pedido_item_ingredientes.filter(s => s.foi_acrescimo).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+  const htmlItens = agruparPedidosPorLeva(itens || []).map(leva => {
+    const horario = new Date(leva.primeiroTempo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const cabecalho = leva.nomeAtendente ? `${horario} · Atendente: ${escapeHtml(leva.nomeAtendente)}` : horario;
 
-    // Nome dinâmico pro Monte-sabores: "— 2 sabores" ou "— 3 sabores",
-    // igual à regra usada na hora de montar o carrinho
-    let nomeItem = pi.itens_cardapio.nome;
-    if (pi.itens_cardapio.tipo_montagem === 'monte_sabores') {
-      const qtdParaNome = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo).length;
-      nomeItem = `${nomeItem} — ${qtdParaNome} sabores`;
-    }
+    const htmlItensLeva = leva.itens.map(pi => {
+      const saboresNormais = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo && !s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+      const substituicoes = pi.pedido_item_ingredientes.filter(s => s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+      const acrescimos = pi.pedido_item_ingredientes.filter(s => s.foi_acrescimo).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
 
-    const horario = new Date(pi.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    // Só permite cancelar se ainda não foi entregue (ainda dá tempo de avisar a cozinha)
-    const podeCancel = pi.status === 'enviado' || pi.status === 'impresso';
-    return `
-      <div class="pedido-enviado-linha">
-        <div class="linha-topo">
-          <span>${pi.quantidade}× ${escapeHtml(nomeItem)}</span>
-          <span>R$ ${(pi.preco_unitario_calculado * pi.quantidade).toFixed(2).replace('.', ',')}</span>
+      // Nome dinâmico pro Monte-sabores: "— 2 sabores" ou "— 3 sabores",
+      // igual à regra usada na hora de montar o carrinho
+      let nomeItem = pi.itens_cardapio.nome;
+      if (pi.itens_cardapio.tipo_montagem === 'monte_sabores') {
+        const qtdParaNome = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo).length;
+        nomeItem = `${nomeItem} — ${qtdParaNome} sabores`;
+      }
+
+      // Só permite cancelar se ainda não foi entregue (ainda dá tempo de avisar a cozinha)
+      const podeCancel = pi.status === 'enviado' || pi.status === 'impresso';
+      return `
+        <div class="pedido-enviado-linha">
+          <div class="linha-topo">
+            <span>${pi.quantidade}× ${escapeHtml(nomeItem)}</span>
+            <span>R$ ${(pi.preco_unitario_calculado * pi.quantidade).toFixed(2).replace('.', ',')}</span>
+          </div>
+          ${saboresNormais ? `<div class="linha-detalhe">${saboresNormais}</div>` : ''}
+          ${pi.observacao ? `<div class="linha-detalhe">${escapeHtml(pi.observacao)}</div>` : ''}
+          ${substituicoes ? `<div class="linha-detalhe">Substituído por: ${substituicoes}</div>` : ''}
+          ${acrescimos ? `<div class="linha-detalhe">+ ACRÉSCIMO: ${acrescimos}</div>` : ''}
+          <span class="linha-status">${pi.status}</span>
+          ${podeCancel ? `<button class="btn-cancelar-item" onclick="cancelarItemEnviado('${pi.id}')">Cancelar item</button>` : ''}
         </div>
-        ${saboresNormais ? `<div class="linha-detalhe">${saboresNormais}</div>` : ''}
-        ${pi.observacao ? `<div class="linha-detalhe">${escapeHtml(pi.observacao)}</div>` : ''}
-        ${substituicoes ? `<div class="linha-detalhe">Substituído por: ${substituicoes}</div>` : ''}
-        ${acrescimos ? `<div class="linha-detalhe">+ ACRÉSCIMO: ${acrescimos}</div>` : ''}
-        <div class="linha-detalhe">${horario}</div>
-        <span class="linha-status">${pi.status}</span>
-        ${podeCancel ? `<button class="btn-cancelar-item" onclick="cancelarItemEnviado('${pi.id}')">Cancelar item</button>` : ''}
+      `;
+    }).join('');
+
+    return `
+      <div class="leva-pedido">
+        <div class="leva-cabecalho">${cabecalho}</div>
+        ${htmlItensLeva}
       </div>
     `;
   }).join('');
@@ -848,6 +859,37 @@ async function abrirPedidosEnviados() {
   `).join('');
 
   lista.innerHTML = htmlBotaoConferencia + htmlItens + htmlObs;
+}
+
+// Agrupa os itens enviados em "levas" (uma leva = uma ação de "enviar
+// pedido"). Como cada item é salvo com um insert separado, os horários
+// não são idênticos — então agrupamos por: mesmo atendente + item
+// enviado a até 10s do anterior da mesma leva
+function agruparPedidosPorLeva(itens) {
+  const levas = [];
+  let levaAtual = null;
+
+  for (const item of itens) {
+    const tempo = new Date(item.criado_em).getTime();
+    const mesmoAtendente = levaAtual && item.criado_por === levaAtual.criadoPor;
+    const dentroDaJanela = levaAtual && (tempo - levaAtual.ultimoTempo) < 10000;
+
+    if (mesmoAtendente && dentroDaJanela) {
+      levaAtual.itens.push(item);
+      levaAtual.ultimoTempo = tempo;
+    } else {
+      levaAtual = {
+        criadoPor: item.criado_por,
+        nomeAtendente: item.perfis?.nome,
+        primeiroTempo: tempo,
+        ultimoTempo: tempo,
+        itens: [item],
+      };
+      levas.push(levaAtual);
+    }
+  }
+
+  return levas;
 }
 
 async function cancelarItemEnviado(pedidoItemId) {

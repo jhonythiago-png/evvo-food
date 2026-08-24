@@ -286,6 +286,16 @@ function escutarMudancas() {
     .subscribe();
 }
 
+// Formata a lista de atendentes de uma comanda: até 3 nomes mostra todos,
+// de 4 em diante resume ("Maria, João +2") — pra não virar bagunça visual
+function formatarAtendentes(nomes) {
+  if (!nomes || nomes.length === 0) return null;
+  const nomesEscapados = nomes.map(n => escapeHtml(n));
+  const rotulo = nomes.length === 1 ? 'Atendente' : 'Atendentes';
+  if (nomes.length <= 3) return `${rotulo}: ${nomesEscapados.join(', ')}`;
+  return `${rotulo}: ${nomesEscapados.slice(0, 2).join(', ')} +${nomes.length - 2}`;
+}
+
 function rotuloComanda(c) {
   if (c.tipo === 'mesa') {
     return c.identificador_pessoa ? `Mesa ${c.numero_mesa} · ${escapeHtml(c.identificador_pessoa)}` : `Mesa ${c.numero_mesa}`;
@@ -336,7 +346,7 @@ function renderComandas() {
       </div>
       <div class="ticket-numero">Comanda #${c.numero_sequencial}</div>
       <div class="ticket-tempo">${tempoAberta(c.aberta_em)}</div>
-      ${c.aberta_por_nome ? `<div class="ticket-atendente">Atendente: ${escapeHtml(c.aberta_por_nome)}</div>` : ''}
+      ${formatarAtendentes(c.nomes_atendentes) ? `<div class="ticket-atendente">${formatarAtendentes(c.nomes_atendentes)}</div>` : ''}
       ${estagio ? `<div class="estagio-entrega ${estagio.classe}">${estagio.texto}</div>` : ''}
       <div class="ticket-divisor"></div>
       <div class="ticket-total-row">
@@ -455,7 +465,7 @@ function renderFechamento() {
 
   document.getElementById('fechamento-titulo').textContent = rotuloComanda(comanda);
   document.getElementById('fechamento-codigo').textContent = `COMANDA #${comanda.numero_sequencial}`;
-  document.getElementById('fechamento-atendente').textContent = comanda.aberta_por_nome ? `Atendente: ${comanda.aberta_por_nome}` : '';
+  document.getElementById('fechamento-atendente').textContent = formatarAtendentes(comanda.nomes_atendentes) || '';
 
   const temIrmas = comandasIrmas && comandasIrmas.length > 0;
 
