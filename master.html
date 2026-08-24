@@ -307,22 +307,25 @@
 
       <div class="info-tipo-card">
         <div class="info-tipo-titulo">🔹 Fixo</div>
-        <p>O item já vem pronto, com uma receita fixa (ex: Pastel de Carne, Frango Especial). O atendente só pode:</p>
+        <p>O item já vem pronto, com uma receita fixa (ex: Pastel de Carne, Frango Especial). O atendente pode:</p>
         <ul class="info-lista">
           <li><strong>Remover</strong> algo do que já vem incluso, de graça (ex: "sem cebola")</li>
-          <li><strong>Adicionar</strong> um acréscimo pago, se você tiver cadastrado algum pra esse item (ex: "+ Bacon R$3")</li>
+          <li><strong>Adicionar</strong> um acréscimo pago, se você tiver cadastrado algum pra esse item (ex: "+ Bacon R$4")</li>
         </ul>
         <p>Ao editar um item Fixo, você marca 2 listas separadas: <strong>"Ingredientes padrão"</strong> (o que já vem, removível de graça) e <strong>"Acréscimos disponíveis"</strong> (opcional, com preço).</p>
+        <p><strong>Substituição grátis:</strong> cada ingrediente que o atendente remover libera 1 "vaga" — a primeira coisa marcada da lista de acréscimo preenche essa vaga <strong>sem cobrar nada</strong> (é só uma troca, não um adicional). Só o que passar disso vira acréscimo cobrado de verdade. Ex: remove Azeitona, marca Cheddar → sem custo (substituição). Remove Azeitona, marca Cheddar e Frango → Cheddar de graça, Frango cobrado.</p>
         <button class="btn-ver-exemplo" onclick="abrirExemploTipo('fixo')">👀 Ver exemplo preenchido</button>
       </div>
 
       <div class="info-tipo-card">
         <div class="info-tipo-titulo">🔹 Monte-sabores</div>
-        <p>O cliente monta o próprio item escolhendo vários sabores (ex: "Monte seu Pastel — 2 sabores"). Você define:</p>
+        <p>O cliente monta o próprio item escolhendo vários sabores (ex: "Monte seu Pastel"). Diferente dos outros tipos, esse tem <strong>2 preços em degrau</strong>, não é só "cota + acréscimo":</p>
         <ul class="info-lista">
-          <li><strong>Quantos sabores vêm inclusos</strong> na cota (ex: 2)</li>
-          <li>A <strong>lista de sabores disponíveis</strong>, cada um com um preço — esse preço só é cobrado se o cliente escolher <strong>além</strong> da cota (ex: escolheu 3 sabores numa cota de 2 → paga o 3º extra)</li>
+          <li><strong>Cota inclusa</strong> (ex: 2 sabores) — é o preço base do item</li>
+          <li><strong>Preço do degrau</strong> — o preço TOTAL quando a pessoa escolhe 1 sabor a mais que a cota (ex: cota de 2 → o degrau é o preço com 3). O sistema calcula a diferença sozinho, você só digita o preço final desse degrau</li>
+          <li>A partir daí, cada sabor extra vira <strong>acréscimo normal</strong> (o preço configurado em cada sabor individualmente)</li>
         </ul>
+        <p>O nome do item no pedido/cupom muda sozinho: "Monte seu Pastel — 2 sabores" ou "— 3 sabores", dependendo de quantos a pessoa escolheu — você não precisa cadastrar um item pra cada quantidade.</p>
         <button class="btn-ver-exemplo" onclick="abrirExemploTipo('monte_sabores')">👀 Ver exemplo preenchido</button>
       </div>
 
@@ -361,7 +364,8 @@
         <li><strong>Mesa</strong>: informa o número; se for mais de uma pessoa na mesma mesa, dá pra abrir uma comanda por pessoa (ex: Mesa 04 · Jhony, Mesa 04 · Thiago)</li>
         <li><strong>Avulsa</strong>: pra venda de balcão, sem mesa — nome do cliente é opcional</li>
         <li><strong>Entrega</strong>: só aparece se "Permite pedidos de entrega" estiver ligado (aba Configurações) — pede nome, telefone, endereço e taxa</li>
-        <li>O botão 📋 dentro da comanda mostra os pedidos já enviados pra cozinha, com opção de cancelar item ou a comanda inteira</li>
+        <li>Depois de enviar o pedido pra cozinha, o sistema volta sozinho pra tela inicial, já com os campos limpos</li>
+        <li>O botão 📋 dentro da comanda mostra os pedidos já enviados pra cozinha (sabores, substituições e acréscimos bem separados), com opção de cancelar item ou a comanda inteira</li>
         <li>O botão "Imprimir conferência" tira um extrato do que já foi pedido, sem fechar a conta</li>
       </ul>
     </div>
@@ -373,6 +377,22 @@
         <li>Define a(s) forma(s) de pagamento — dá pra dividir entre várias formas na mesma conta</li>
         <li>Se for <strong>Dinheiro</strong>, tem a calculadora de troco: digita quanto o cliente vai pagar, o sistema calcula o troco sozinho e já imprime no cupom</li>
         <li><strong>Comanda de entrega</strong> funciona em 3 etapas: 🟡 Preparando → 🔵 Saiu pra entrega (já define a forma de pagamento aqui, pro motoboy saber o que cobrar) → 🟢 Entregue (só agora a venda conta no financeiro de verdade)</li>
+        <li>O botão <strong>"📜 Histórico"</strong> mostra as comandas já fechadas (filtro Hoje / Últimos 7 dias) — dá pra só <strong>"👁️ Ver"</strong> os detalhes (sem imprimir nada) ou <strong>"🖨️ Reimprimir"</strong> o cupom de fechamento de verdade</li>
+      </ul>
+    </div>
+
+    <div class="painel">
+      <div class="painel-header"><h3>🔓 Abertura e Fechamento de Caixa</h3></div>
+      <p class="info-paragrafo">
+        Diferente do fechamento de <em>conta</em> (uma comanda), isso é o controle do <strong>turno do dia</strong> — o
+        troco físico que fica na gaveta.
+      </p>
+      <ul class="info-lista">
+        <li><strong>Abrir Caixa</strong>: informa quanto de troco está deixando na gaveta antes de começar a vender</li>
+        <li><strong>Fechar Caixa</strong>: o sistema calcula sozinho o "esperado" (troco inicial + tudo que entrou em dinheiro + ajustes de caixa do turno) — separado por forma de pagamento também (cartão, débito, pix, dinheiro)</li>
+        <li>Antes de fechar de vez, dá pra <strong>"🖨️ Imprimir conferência"</strong> — sai o resumo no papel pra contar o dinheiro físico com calma, sem travar nada no sistema ainda</li>
+        <li>Só depois de contar, digita o valor real da gaveta — o sistema mostra na hora se "bateu certinho", "faltou" ou "sobrou", e só aí confirma o fechamento de vez (que também já imprime um cupom final)</li>
+        <li><strong>"🗂️ Turnos"</strong> guarda o histórico de todos os turnos já fechados, com opção de reimprimir qualquer um depois</li>
       </ul>
     </div>
 
@@ -380,7 +400,7 @@
       <div class="painel-header"><h3>📊 Financeiro</h3></div>
       <ul class="info-lista">
         <li><strong>Receita</strong>: soma das comandas fechadas no período escolhido</li>
-        <li><strong>Despesas</strong>: gastos do negócio (aluguel, fornecedor, etc.) — só conta quando marcado como "pago"</li>
+        <li><strong>Despesas</strong>: gastos do negócio (aluguel, fornecedor, etc.) — só conta quando marcado como "pago". Dá pra <strong>editar</strong> ou <strong>excluir</strong> qualquer despesa lançada por engano</li>
         <li><strong>Ajuste de caixa</strong>: pra registrar diferença real de dinheiro (sobrou ou faltou no caixa) — mexe no <strong>Saldo</strong>, mas nunca na Receita</li>
         <li><strong>Saldo</strong> = Receita − Despesas pagas ± Ajustes de caixa</li>
       </ul>
