@@ -335,8 +335,8 @@ function renderComandas() {
         <span class="dot"></span>
       </div>
       <div class="ticket-numero">Comanda #${c.numero_sequencial}</div>
-      ${c.aberta_por_nome ? `<div class="ticket-atendente">Atendente: ${escapeHtml(c.aberta_por_nome)}</div>` : ''}
       <div class="ticket-tempo">${tempoAberta(c.aberta_em)}</div>
+      ${c.aberta_por_nome ? `<div class="ticket-atendente">Atendente: ${escapeHtml(c.aberta_por_nome)}</div>` : ''}
       ${estagio ? `<div class="estagio-entrega ${estagio.classe}">${estagio.texto}</div>` : ''}
       <div class="ticket-divisor"></div>
       <div class="ticket-total-row">
