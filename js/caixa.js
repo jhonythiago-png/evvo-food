@@ -98,7 +98,7 @@ async function carregarHistorico() {
     .from('fechamentos')
     .select(`
       id, valor_total, subtotal_itens, taxa_servico_percentual, taxa_servico_valor, taxa_entrega_valor, fechado_em,
-      comandas!inner ( id, numero_sequencial, tipo, numero_mesa, nome_cliente, identificador_pessoa, telefone_contato, endereco_entrega, estabelecimento_id, status )
+      comandas!inner ( id, numero_sequencial, tipo, numero_mesa, nome_cliente, identificador_pessoa, telefone_contato, endereco_entrega, estabelecimento_id, status, aberta_por, perfis(nome) )
     `)
     .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
     .eq('comandas.status', 'fechada')
@@ -125,11 +125,13 @@ function renderHistorico() {
 
   grid.innerHTML = estado.historico.map(f => {
     const horario = new Date(f.fechado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const nomeAtendente = f.comandas.perfis?.nome;
     return `
       <div class="historico-linha">
         <div class="historico-info">
           <div class="badge">${rotuloComanda(f.comandas)}</div>
           <div class="detalhe">#${f.comandas.numero_sequencial} · ${horario}</div>
+          ${nomeAtendente ? `<div class="detalhe">Atendente: ${escapeHtml(nomeAtendente)}</div>` : ''}
         </div>
         <div class="historico-direita">
           <span class="historico-valor">R$ ${Number(f.valor_total).toFixed(2).replace('.', ',')}</span>
@@ -152,7 +154,7 @@ async function verDetalhesHistorico(fechamentoId) {
 
   document.getElementById('modal-ver-historico-overlay').style.display = 'flex';
   document.getElementById('ver-historico-titulo').textContent = rotuloComanda(comanda);
-  document.getElementById('ver-historico-numero').textContent = `Comanda #${comanda.numero_sequencial}`;
+  document.getElementById('ver-historico-numero').textContent = `Comanda #${comanda.numero_sequencial}${comanda.perfis?.nome ? ` · Atendente: ${comanda.perfis.nome}` : ''}`;
   document.getElementById('ver-historico-conteudo').innerHTML = '<div class="aviso-vazio-pequeno">Carregando...</div>';
 
   const [{ data: itens }, { data: pagamentos }] = await Promise.all([
@@ -333,6 +335,7 @@ function renderComandas() {
         <span class="dot"></span>
       </div>
       <div class="ticket-numero">Comanda #${c.numero_sequencial}</div>
+      ${c.aberta_por_nome ? `<div class="ticket-atendente">Atendente: ${escapeHtml(c.aberta_por_nome)}</div>` : ''}
       <div class="ticket-tempo">${tempoAberta(c.aberta_em)}</div>
       ${estagio ? `<div class="estagio-entrega ${estagio.classe}">${estagio.texto}</div>` : ''}
       <div class="ticket-divisor"></div>
@@ -452,6 +455,7 @@ function renderFechamento() {
 
   document.getElementById('fechamento-titulo').textContent = rotuloComanda(comanda);
   document.getElementById('fechamento-codigo').textContent = `COMANDA #${comanda.numero_sequencial}`;
+  document.getElementById('fechamento-atendente').textContent = comanda.aberta_por_nome ? `Atendente: ${comanda.aberta_por_nome}` : '';
 
   const temIrmas = comandasIrmas && comandasIrmas.length > 0;
 
