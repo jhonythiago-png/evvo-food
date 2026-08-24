@@ -1087,6 +1087,13 @@ async function confirmarFechamentoCaixa() {
     return;
   }
 
+  // Já dispara a impressão do fechamento automaticamente
+  await supabaseClient.from('solicitacoes_impressao').insert({
+    caixa_turno_id: estado.caixaAtual.id,
+    tipo: 'fechamento_caixa',
+    criado_por: estado.perfil.id,
+  });
+
   mostrarToast('Caixa fechado! 🔒');
   fecharModalFecharCaixa();
   await carregarStatusCaixa();
@@ -1156,9 +1163,46 @@ function renderHistoricoCaixa() {
           Esperado R$ ${Number(c.valor_esperado).toFixed(2).replace('.', ',')} · Contado R$ ${Number(c.valor_contado).toFixed(2).replace('.', ',')}
         </div>
         <div class="caixa-turno-dif ${classeDif}">${textoDif}</div>
+        <button class="btn-reimprimir" style="margin-top:8px;" onclick="reimprimirFechamentoCaixa('${c.id}')">🖨️ Reimprimir</button>
       </div>
     `;
   }).join('');
+}
+
+async function reimprimirFechamentoCaixa(caixaTurnoId) {
+  const { error } = await supabaseClient.from('solicitacoes_impressao').insert({
+    caixa_turno_id: caixaTurnoId,
+    tipo: 'fechamento_caixa',
+    criado_por: estado.perfil.id,
+  });
+
+  if (error) {
+    mostrarToast('Erro ao pedir impressão.', 'erro');
+    console.error(error);
+    return;
+  }
+
+  mostrarToast('Reimpressão enviada! 🖨️');
+}
+
+// Imprime o resumo ANTES de fechar de verdade — pra conferir o dinheiro
+// com o papel em mãos, sem travar/decidir nada no sistema ainda
+async function imprimirConferenciaCaixa() {
+  if (!estado.caixaAtual) return;
+
+  const { error } = await supabaseClient.from('solicitacoes_impressao').insert({
+    caixa_turno_id: estado.caixaAtual.id,
+    tipo: 'conferencia_caixa',
+    criado_por: estado.perfil.id,
+  });
+
+  if (error) {
+    mostrarToast('Erro ao pedir impressão.', 'erro');
+    console.error(error);
+    return;
+  }
+
+  mostrarToast('Conferência enviada pra impressão! 🖨️');
 }
 
 iniciar();

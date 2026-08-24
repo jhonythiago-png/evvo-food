@@ -9,6 +9,7 @@ const estado = {
   dataFim: null,
   despesas: [],
   sangrias: [],
+  despesaEmEdicaoId: null,
 };
 
 const NOMES_CATEGORIA = {
@@ -17,6 +18,29 @@ const NOMES_CATEGORIA = {
   manutencao: 'Manutenção', outro: 'Outro',
 };
 const NOMES_PAGAMENTO = { dinheiro: 'Dinheiro', debito: 'Débito', credito: 'Crédito', pix: 'Pix' };
+
+// ------------------------------------------------------------
+// Modal de confirmação genérico — substitui o confirm() nativo,
+// que não é confiável em apps salvos na tela inicial do iPhone
+// ------------------------------------------------------------
+let acaoConfirmacaoPendente = null;
+
+function mostrarConfirmacaoGenerica(mensagem, aoConfirmar) {
+  document.getElementById('confirmacao-generica-texto').textContent = mensagem;
+  acaoConfirmacaoPendente = aoConfirmar;
+  document.getElementById('modal-confirmacao-generica-overlay').style.display = 'flex';
+}
+
+function fecharModalConfirmacaoGenerica() {
+  document.getElementById('modal-confirmacao-generica-overlay').style.display = 'none';
+  acaoConfirmacaoPendente = null;
+}
+
+async function executarConfirmacaoGenerica() {
+  const acao = acaoConfirmacaoPendente;
+  fecharModalConfirmacaoGenerica();
+  if (acao) await acao();
+}
 
 // ------------------------------------------------------------
 // Inicialização
@@ -266,6 +290,8 @@ function renderDespesas() {
         <span class="despesa-valor">${formatarMoeda(d.valor)}</span>
         <span class="despesa-status ${d.status}">${d.status === 'pago' ? 'Pago' : 'Pendente'}</span>
         ${d.status === 'pendente' ? `<button class="btn-marcar-pago" onclick="marcarComoPago('${d.id}')">Marcar como pago</button>` : ''}
+        <button class="btn-editar-despesa" onclick="abrirModalDespesa('${d.id}')">Editar</button>
+        <button class="btn-excluir-despesa" onclick="confirmarExcluirDespesa('${d.id}')">Excluir</button>
       </div>
     </div>
   `).join('');
@@ -284,17 +310,36 @@ async function marcarComoPago(despesaId) {
   carregarRelatorios();
 }
 
-function abrirModalDespesa() {
+function abrirModalDespesa(despesaId) {
+  const despesa = despesaId ? estado.despesas.find(d => d.id === despesaId) : null;
+  estado.despesaEmEdicaoId = despesaId || null;
+
+  document.getElementById('modal-despesa-titulo').textContent = despesa ? 'Editar despesa' : 'Nova despesa';
   document.getElementById('modal-despesa-overlay').style.display = 'flex';
-  document.getElementById('input-despesa-descricao').value = '';
-  document.getElementById('input-despesa-valor').value = '';
-  document.getElementById('input-despesa-vencimento').value = formatarDataISO(new Date());
-  document.getElementById('input-despesa-categoria').value = 'outro';
-  document.getElementById('input-despesa-ja-pago').checked = false;
+  document.getElementById('input-despesa-descricao').value = despesa ? despesa.descricao : '';
+  document.getElementById('input-despesa-valor').value = despesa ? String(despesa.valor).replace('.', ',') : '';
+  document.getElementById('input-despesa-vencimento').value = despesa ? despesa.data_vencimento : formatarDataISO(new Date());
+  document.getElementById('input-despesa-categoria').value = despesa ? despesa.categoria : 'outro';
+  document.getElementById('input-despesa-ja-pago').checked = despesa ? despesa.status === 'pago' : false;
 }
 
 function fecharModalDespesa() {
   document.getElementById('modal-despesa-overlay').style.display = 'none';
+  estado.despesaEmEdicaoId = null;
+}
+
+function confirmarExcluirDespesa(despesaId) {
+  const despesa = estado.despesas.find(d => d.id === despesaId);
+  mostrarConfirmacaoGenerica(
+    `Excluir a despesa "${despesa?.descricao}" de vez? Isso não tem volta.`,
+    async () => {
+      const { error } = await supabaseClient.from('despesas').delete().eq('id', despesaId);
+      if (error) { mostrarToast('Erro ao excluir despesa.', 'erro'); return; }
+      mostrarToast('Despesa excluída.');
+      await carregarDespesas();
+      carregarRelatorios();
+    }
+  );
 }
 
 async function salvarDespesa() {
@@ -311,16 +356,25 @@ async function salvarDespesa() {
     return;
   }
 
-  const { error } = await supabaseClient.from('despesas').insert({
-    estabelecimento_id: estado.perfil.estabelecimento_id,
+  const dadosDespesa = {
     descricao,
     categoria,
     valor,
     data_vencimento: vencimento,
     status: jaPago ? 'pago' : 'pendente',
     data_pagamento: jaPago ? formatarDataISO(new Date()) : null,
-    criado_por: estado.perfil.id,
-  });
+  };
+
+  let error;
+  if (estado.despesaEmEdicaoId) {
+    ({ error } = await supabaseClient.from('despesas').update(dadosDespesa).eq('id', estado.despesaEmEdicaoId));
+  } else {
+    ({ error } = await supabaseClient.from('despesas').insert({
+      ...dadosDespesa,
+      estabelecimento_id: estado.perfil.estabelecimento_id,
+      criado_por: estado.perfil.id,
+    }));
+  }
 
   if (error) {
     mostrarToast('Erro ao salvar despesa.', 'erro');
@@ -328,7 +382,7 @@ async function salvarDespesa() {
     return;
   }
 
-  mostrarToast('Despesa cadastrada!');
+  mostrarToast(estado.despesaEmEdicaoId ? 'Despesa atualizada!' : 'Despesa cadastrada!');
   fecharModalDespesa();
   await carregarDespesas();
   carregarRelatorios();
