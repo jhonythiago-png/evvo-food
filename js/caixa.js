@@ -161,7 +161,7 @@ async function verDetalhesHistorico(fechamentoId) {
       .select(`
         quantidade, preco_unitario_calculado, observacao,
         itens_cardapio ( nome ),
-        pedido_item_ingredientes ( foi_acrescimo, ingredientes ( nome ) )
+        pedido_item_ingredientes ( foi_acrescimo, foi_substituicao, ingredientes ( nome ) )
       `)
       .eq('comanda_id', comanda.id)
       .neq('status', 'cancelado'),
@@ -184,7 +184,8 @@ async function verDetalhesHistorico(fechamentoId) {
   ` : '';
 
   const htmlItens = (itens || []).map(item => {
-    const sabores = item.pedido_item_ingredientes.filter(s => !s.foi_acrescimo).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const sabores = item.pedido_item_ingredientes.filter(s => !s.foi_acrescimo && !s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const substituicoes = item.pedido_item_ingredientes.filter(s => s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
     const acrescimos = item.pedido_item_ingredientes.filter(s => s.foi_acrescimo).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
     return `
       <div class="ver-historico-item">
@@ -193,8 +194,9 @@ async function verDetalhesHistorico(fechamentoId) {
           <span>R$ ${(item.preco_unitario_calculado * item.quantidade).toFixed(2).replace('.', ',')}</span>
         </div>
         ${sabores ? `<div class="ver-historico-item-detalhe">${sabores}</div>` : ''}
+        ${item.observacao ? `<div class="ver-historico-item-detalhe">${escapeHtml(item.observacao)}</div>` : ''}
+        ${substituicoes ? `<div class="ver-historico-item-detalhe">Substituído por: ${substituicoes}</div>` : ''}
         ${acrescimos ? `<div class="ver-historico-item-detalhe">+ ACRÉSCIMO: ${acrescimos}</div>` : ''}
-        ${item.observacao ? `<div class="ver-historico-item-detalhe">OBS: ${escapeHtml(item.observacao)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -395,7 +397,7 @@ async function abrirFechamento(comandaId) {
     .select(`
       id, item_cardapio_id, quantidade, observacao, preco_unitario_calculado, status,
       itens_cardapio ( nome ),
-      pedido_item_ingredientes ( ingrediente_id, foi_acrescimo, preco_acrescimo_aplicado, ingredientes ( nome ) )
+      pedido_item_ingredientes ( ingrediente_id, foi_acrescimo, foi_substituicao, preco_acrescimo_aplicado, ingredientes ( nome ) )
     `)
     .eq('comanda_id', comandaId)
     .neq('status', 'cancelado');
@@ -454,13 +456,17 @@ function renderFechamento() {
   const temIrmas = comandasIrmas && comandasIrmas.length > 0;
 
   document.getElementById('fechamento-itens').innerHTML = itens.map(item => {
-    const sabores = item.pedido_item_ingredientes.map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const sabores = item.pedido_item_ingredientes.filter(s => !s.foi_acrescimo && !s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const substituicoes = item.pedido_item_ingredientes.filter(s => s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
+    const acrescimos = item.pedido_item_ingredientes.filter(s => s.foi_acrescimo).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
     return `
       <div class="fechamento-item-linha">
         <div>
           <div class="item-nome">${item.quantidade}× ${escapeHtml(item.itens_cardapio.nome)}</div>
           ${sabores ? `<div class="item-detalhe">${sabores}</div>` : ''}
           ${item.observacao ? `<div class="item-detalhe">${escapeHtml(item.observacao)}</div>` : ''}
+          ${substituicoes ? `<div class="item-detalhe">Substituído por: ${substituicoes}</div>` : ''}
+          ${acrescimos ? `<div class="item-detalhe">+ ACRÉSCIMO: ${acrescimos}</div>` : ''}
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <span class="item-valor">R$ ${(item.preco_unitario_calculado * item.quantidade).toFixed(2).replace('.', ',')}</span>
@@ -619,6 +625,7 @@ async function confirmarTransferencia(comandaDestinoId) {
           pedido_item_id: novaLinha.id,
           ingrediente_id: s.ingrediente_id,
           foi_acrescimo: s.foi_acrescimo,
+          foi_substituicao: s.foi_substituicao || false,
           preco_acrescimo_aplicado: s.preco_acrescimo_aplicado,
         }));
         await supabaseClient.from('pedido_item_ingredientes').insert(copiaSabores);
