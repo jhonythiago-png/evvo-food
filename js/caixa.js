@@ -934,6 +934,15 @@ async function confirmarAberturaCaixa() {
     return;
   }
 
+  // Reseta a numeração das comandas — como o fechamento de caixa só é
+  // permitido sem nenhuma comanda aberta, é seguro reiniciar do #1 aqui
+  const { error: erroReset } = await supabaseClient
+    .from('contadores_comanda')
+    .update({ ultimo_numero: 0 })
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id);
+
+  if (erroReset) console.error('Erro ao resetar numeração:', erroReset);
+
   mostrarToast('Caixa aberto! 🔓');
   fecharModalAbrirCaixa();
   await carregarStatusCaixa();
@@ -1083,6 +1092,26 @@ async function confirmarFechamentoCaixa() {
   const contadoTexto = document.getElementById('input-fechar-caixa-contado').value;
   if (!contadoTexto) {
     mostrarToast('Digita quanto tem na gaveta pra confirmar.', 'erro');
+    return;
+  }
+
+  // Só deixa fechar o caixa se NÃO tiver nenhuma comanda ainda aberta —
+  // isso garante que amanhã, ao abrir o caixa de novo, a numeração pode
+  // reiniciar do #1 sem risco de conflitar com uma comanda antiga
+  const { count: qtdComandasAbertas, error: erroCheck } = await supabaseClient
+    .from('comandas')
+    .select('id', { count: 'exact', head: true })
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .eq('status', 'aberta');
+
+  if (erroCheck) {
+    mostrarToast('Erro ao verificar comandas abertas.', 'erro');
+    console.error(erroCheck);
+    return;
+  }
+
+  if (qtdComandasAbertas > 0) {
+    mostrarToast(`Ainda tem ${qtdComandasAbertas} comanda(s) aberta(s). Fecha todas antes de fechar o caixa.`, 'erro');
     return;
   }
 
