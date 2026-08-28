@@ -25,6 +25,11 @@
   }
   .bloco-nova-comanda { background: var(--ink-soft); border: 1px solid var(--ink-line); border-radius: var(--radius-lg); padding: 18px; }
   .bloco-nova-comanda h3 { font-family: var(--font-display); font-size: 15px; margin-bottom: 12px; }
+  #aviso-caixa-fechado {
+    background: rgba(214,67,42,.14); border: 1px solid rgba(214,67,42,.4); color: #F0A08D;
+    border-radius: var(--radius-md); padding: 12px 14px; font-size: 13px; font-weight: 600;
+    margin-bottom: 16px; line-height: 1.4;
+  }
   .bloco-nova-comanda .linha { display: flex; gap: 8px; }
   .bloco-nova-comanda input { flex: 1; }
 
@@ -211,6 +216,9 @@
 
 <!-- TELA 1: seleção/abertura de comanda -->
 <div id="tela-selecao-comanda">
+  <div id="aviso-caixa-fechado" style="display:none;">
+    🔒 Caixa ainda não foi aberto hoje — peça pro caixa abrir antes de lançar pedidos.
+  </div>
   <div class="bloco-nova-comanda">
     <h3>Nova comanda de mesa</h3>
     <div class="linha">
