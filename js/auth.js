@@ -242,10 +242,14 @@ function injetarNavegacao(perfil, paginaAtual) {
     { id: 'financeiro', label: 'Financeiro', href: 'financeiro.html', masterOnly: true },
     { id: 'cardapio', label: 'Cardápio', href: 'cardapio.html', masterOnly: true },
     { id: 'master', label: 'Config', href: 'master.html', masterOnly: true },
-    { id: 'informacoes', label: 'Informação', href: 'informacoes.html', masterOnly: false },
+    // Só pro Funcionário — o Master já tem esse conteúdo dentro de Config
+    { id: 'informacoes', label: 'Informação', href: 'informacoes.html', funcionarioOnly: true },
   ];
 
-  const visiveis = paginas.filter(p => !p.masterOnly || perfil.nivel_acesso === 'master');
+  const visiveis = paginas.filter(p => {
+    if (p.funcionarioOnly) return perfil.nivel_acesso !== 'master';
+    return !p.masterOnly || perfil.nivel_acesso === 'master';
+  });
 
   const linksHtml = visiveis.map(p => `
     <a href="${p.href}" class="sidebar-nav-link ${p.id === paginaAtual ? 'on' : ''}">${p.label}</a>
