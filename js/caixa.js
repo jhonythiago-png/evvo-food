@@ -344,7 +344,7 @@ function renderComandas() {
         <span class="badge">${rotuloComanda(c)}</span>
         <span class="dot"></span>
       </div>
-      <div class="ticket-numero">Comanda #${c.numero_sequencial}</div>
+      <div class="ticket-numero">${c.numero_sequencial ? `Comanda #${c.numero_sequencial}` : 'Sem pedido ainda'}</div>
       <div class="ticket-tempo">${tempoAberta(c.aberta_em)}</div>
       ${formatarAtendentes(c.nomes_atendentes) ? `<div class="ticket-atendente">${formatarAtendentes(c.nomes_atendentes)}</div>` : ''}
       ${estagio ? `<div class="estagio-entrega ${estagio.classe}">${estagio.texto}</div>` : ''}
@@ -464,7 +464,7 @@ function renderFechamento() {
   const { subtotal, taxaValor, total } = calcularValores();
 
   document.getElementById('fechamento-titulo').textContent = rotuloComanda(comanda);
-  document.getElementById('fechamento-codigo').textContent = `COMANDA #${comanda.numero_sequencial}`;
+  document.getElementById('fechamento-codigo').textContent = comanda.numero_sequencial ? `COMANDA #${comanda.numero_sequencial}` : 'AGUARDANDO 1º PEDIDO';
   document.getElementById('fechamento-atendente').textContent = formatarAtendentes(comanda.nomes_atendentes) || '';
 
   const temIrmas = comandasIrmas && comandasIrmas.length > 0;

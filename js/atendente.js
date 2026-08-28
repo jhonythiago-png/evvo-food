@@ -217,7 +217,7 @@ async function carregarComandasAbertas() {
   lista.innerHTML = data.map(c => `
     <button class="comanda-card" onclick="selecionarComanda('${c.id}')">
       <span class="badge">${rotuloComanda(c)}</span>
-      <span class="numero">#${c.numero_sequencial}</span>
+      <span class="numero">${c.numero_sequencial ? `#${c.numero_sequencial}` : 'Sem pedido ainda'}</span>
       ${c.perfis?.nome ? `<span class="comanda-atendente">Atendente: ${escapeHtml(c.perfis.nome)}</span>` : ''}
     </button>
   `).join('');
@@ -284,16 +284,13 @@ async function abrirNovaComandaEntrega() {
 }
 
 async function criarComanda(dados) {
-  const { data: numero, error: erroNumero } = await supabaseClient
-    .rpc('fn_proximo_numero_comanda', { p_estabelecimento_id: estado.perfil.estabelecimento_id });
-
-  if (erroNumero) { mostrarToast('Erro ao gerar número da comanda.', 'erro'); return; }
-
+  // O número só é atribuído no PRIMEIRO pedido enviado (não na abertura) —
+  // assim a numeração reflete a ordem real de chegada na cozinha, não a
+  // ordem que a mesa foi aberta no sistema
   const { data: comanda, error } = await supabaseClient
     .from('comandas')
     .insert({
       estabelecimento_id: estado.perfil.estabelecimento_id,
-      numero_sequencial: numero,
       aberta_por: estado.perfil.id,
       ...dados,
     })
@@ -318,7 +315,7 @@ function mostrarTelaCardapio() {
 
   const c = estado.comandaAtual;
   document.getElementById('titulo-comanda').textContent = rotuloComanda(c);
-  document.getElementById('codigo-comanda').textContent = `COMANDA #${c.numero_sequencial}`;
+  document.getElementById('codigo-comanda').textContent = c.numero_sequencial ? `COMANDA #${c.numero_sequencial}` : 'AGUARDANDO 1º PEDIDO';
 
   const elEndereco = document.getElementById('endereco-entrega-aviso');
   if (c.tipo === 'entrega' && c.endereco_entrega) {
@@ -699,6 +696,25 @@ async function enviarPedido() {
   btn.textContent = 'Enviando...';
 
   try {
+    // Se essa comanda ainda não tem número (é o primeiro pedido dela),
+    // atribui agora — ANTES de mandar os itens, pra já sair certo no
+    // cupom da cozinha, sem risco de corrida entre as duas ações
+    if (!estado.comandaAtual.numero_sequencial) {
+      const { data: numero, error: erroNumero } = await supabaseClient
+        .rpc('fn_proximo_numero_comanda', { p_estabelecimento_id: estado.perfil.estabelecimento_id });
+
+      if (erroNumero) throw erroNumero;
+
+      const { error: erroUpdate } = await supabaseClient
+        .from('comandas')
+        .update({ numero_sequencial: numero })
+        .eq('id', estado.comandaAtual.id);
+
+      if (erroUpdate) throw erroUpdate;
+
+      estado.comandaAtual.numero_sequencial = numero;
+    }
+
     for (const linha of estado.carrinho) {
       const { data: pedidoItem, error } = await supabaseClient
         .from('pedido_itens')
