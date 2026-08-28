@@ -242,6 +242,7 @@ function injetarNavegacao(perfil, paginaAtual) {
     { id: 'financeiro', label: 'Financeiro', href: 'financeiro.html', masterOnly: true },
     { id: 'cardapio', label: 'Cardápio', href: 'cardapio.html', masterOnly: true },
     { id: 'master', label: 'Config', href: 'master.html', masterOnly: true },
+    { id: 'informacoes', label: 'Informação', href: 'informacoes.html', masterOnly: false },
   ];
 
   const visiveis = paginas.filter(p => !p.masterOnly || perfil.nivel_acesso === 'master');
