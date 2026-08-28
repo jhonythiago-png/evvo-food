@@ -364,8 +364,10 @@
         <li><strong>Mesa</strong>: informa o número; se for mais de uma pessoa na mesma mesa, dá pra abrir uma comanda por pessoa (ex: Mesa 04 · Jhony, Mesa 04 · Thiago)</li>
         <li><strong>Avulsa</strong>: pra venda de balcão, sem mesa — nome do cliente é opcional</li>
         <li><strong>Entrega</strong>: só aparece se "Permite pedidos de entrega" estiver ligado (aba Configurações) — pede nome, telefone, endereço e taxa</li>
+        <li>⚠️ <strong>Precisa ter o caixa aberto</strong> pra conseguir enviar pedido — se ainda não abriu, aparece um aviso vermelho na tela inicial. Não precisa ter troco nenhum, só precisa estar aberto</li>
+        <li>A comanda <strong>não</strong> ganha número (#1, #2...) só de ser aberta — o número só é atribuído no <strong>primeiro pedido enviado</strong>, pra bater certinho com a ordem real de chegada na cozinha. Até lá, aparece "Sem pedido ainda"</li>
         <li>Depois de enviar o pedido pra cozinha, o sistema volta sozinho pra tela inicial, já com os campos limpos</li>
-        <li>O botão 📋 dentro da comanda mostra os pedidos já enviados pra cozinha (sabores, substituições e acréscimos bem separados), com opção de cancelar item ou a comanda inteira</li>
+        <li>O botão 📋 dentro da comanda mostra os pedidos já enviados, <strong>agrupados por leva</strong> — cada leva mostra o horário e quem mandou (importante se mais de um atendente mexer na mesma mesa)</li>
         <li>O botão "Imprimir conferência" tira um extrato do que já foi pedido, sem fechar a conta</li>
       </ul>
     </div>
@@ -378,6 +380,7 @@
         <li>Se for <strong>Dinheiro</strong>, tem a calculadora de troco: digita quanto o cliente vai pagar, o sistema calcula o troco sozinho e já imprime no cupom</li>
         <li><strong>Comanda de entrega</strong> funciona em 3 etapas: 🟡 Preparando → 🔵 Saiu pra entrega (já define a forma de pagamento aqui, pro motoboy saber o que cobrar) → 🟢 Entregue (só agora a venda conta no financeiro de verdade)</li>
         <li>O botão <strong>"📜 Histórico"</strong> mostra as comandas já fechadas (filtro Hoje / Últimos 7 dias) — dá pra só <strong>"👁️ Ver"</strong> os detalhes (sem imprimir nada) ou <strong>"🖨️ Reimprimir"</strong> o cupom de fechamento de verdade</li>
+        <li>Se mais de um atendente lançou pedido na mesma comanda, o card e o cupom mostram <strong>todos</strong> os nomes envolvidos (ex: "Atendentes: Maria, João")</li>
       </ul>
     </div>
 
@@ -385,11 +388,13 @@
       <div class="painel-header"><h3>🔓 Abertura e Fechamento de Caixa</h3></div>
       <p class="info-paragrafo">
         Diferente do fechamento de <em>conta</em> (uma comanda), isso é o controle do <strong>turno do dia</strong> — o
-        troco físico que fica na gaveta.
+        troco físico que fica na gaveta. É <strong>obrigatório</strong> abrir o caixa antes de qualquer pedido poder
+        ser enviado (mesmo que seja "abrir com R$0,00", sem troco nenhum).
       </p>
       <ul class="info-lista">
-        <li><strong>Abrir Caixa</strong>: informa quanto de troco está deixando na gaveta antes de começar a vender</li>
+        <li><strong>Abrir Caixa</strong>: informa quanto de troco está deixando na gaveta antes de começar a vender. A numeração das comandas <strong>reinicia do #1</strong> a cada abertura nova</li>
         <li><strong>Fechar Caixa</strong>: o sistema calcula sozinho o "esperado" (troco inicial + tudo que entrou em dinheiro + ajustes de caixa do turno) — separado por forma de pagamento também (cartão, débito, pix, dinheiro)</li>
+        <li>⚠️ <strong>Só deixa fechar o caixa se todas as comandas já estiverem fechadas</strong> — se tiver alguma aberta, o sistema avisa quantas faltam. Isso garante que o próximo turno comece limpo, sem risco de número repetido</li>
         <li>Antes de fechar de vez, dá pra <strong>"🖨️ Imprimir conferência"</strong> — sai o resumo no papel pra contar o dinheiro físico com calma, sem travar nada no sistema ainda</li>
         <li>Só depois de contar, digita o valor real da gaveta — o sistema mostra na hora se "bateu certinho", "faltou" ou "sobrou", e só aí confirma o fechamento de vez (que também já imprime um cupom final)</li>
         <li><strong>"🗂️ Turnos"</strong> guarda o histórico de todos os turnos já fechados, com opção de reimprimir qualquer um depois</li>
