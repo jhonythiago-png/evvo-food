@@ -696,6 +696,22 @@ async function enviarPedido() {
   btn.textContent = 'Enviando...';
 
   try {
+    // Só deixa enviar pedido se o caixa do turno estiver aberto — isso
+    // garante que todo pedido sempre acontece dentro de um ciclo de
+    // caixa, com numeração e conferência batendo direitinho no final
+    const { count: qtdCaixaAberto, error: erroCaixa } = await supabaseClient
+      .from('caixas_turno')
+      .select('id', { count: 'exact', head: true })
+      .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+      .eq('status', 'aberto');
+
+    if (erroCaixa) throw erroCaixa;
+
+    if (!qtdCaixaAberto) {
+      mostrarToast('O caixa ainda não foi aberto hoje. Peça pro caixa abrir primeiro (mesmo que sem troco).', 'erro');
+      return;
+    }
+
     // Se essa comanda ainda não tem número (é o primeiro pedido dela),
     // atribui agora — ANTES de mandar os itens, pra já sair certo no
     // cupom da cozinha, sem risco de corrida entre as duas ações
