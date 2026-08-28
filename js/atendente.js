@@ -29,11 +29,31 @@ async function iniciar() {
   await carregarConfiguracaoEstabelecimento();
   await carregarCardapio();
   await carregarComandasAbertas();
+  await verificarStatusCaixa();
   escutarMudancasComandas();
 
   // Verificação automática a cada 5s — garante que a lista/comanda atual
   // fique sempre atualizada, mesmo se o aviso em tempo real não chegar
-  setInterval(verificarAtualizacoes, 5000);
+  setInterval(() => {
+    verificarAtualizacoes();
+    verificarStatusCaixa();
+  }, 5000);
+}
+
+// Mostra um aviso na tela inicial se o caixa do turno ainda não foi
+// aberto — evita que o atendente monte um pedido inteiro só pra
+// descobrir, na hora de enviar, que o caixa está fechado
+async function verificarStatusCaixa() {
+  const { count, error } = await supabaseClient
+    .from('caixas_turno')
+    .select('id', { count: 'exact', head: true })
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .eq('status', 'aberto');
+
+  if (error) { console.error(error); return; }
+
+  const aviso = document.getElementById('aviso-caixa-fechado');
+  if (aviso) aviso.style.display = count ? 'none' : 'block';
 }
 
 async function carregarConfiguracaoEstabelecimento() {
