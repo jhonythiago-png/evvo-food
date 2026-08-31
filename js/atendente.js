@@ -751,6 +751,14 @@ async function enviarPedido() {
       estado.comandaAtual.numero_sequencial = numero;
     }
 
+    // Todo ENVIO (não só o primeiro da comanda) recebe seu próprio número
+    // de pedido — é isso que reflete a ordem real de chegada na cozinha,
+    // mesmo quando a mesma mesa manda mais de um pedido ao longo do dia
+    const { data: numeroPedido, error: erroNumeroPedido } = await supabaseClient
+      .rpc('fn_proximo_numero_pedido', { p_estabelecimento_id: estado.perfil.estabelecimento_id });
+
+    if (erroNumeroPedido) throw erroNumeroPedido;
+
     for (const linha of estado.carrinho) {
       const { data: pedidoItem, error } = await supabaseClient
         .from('pedido_itens')
@@ -762,6 +770,7 @@ async function enviarPedido() {
           observacao: linha.observacao,
           status: 'enviado',
           criado_por: estado.perfil.id,
+          numero_pedido: numeroPedido,
         })
         .select()
         .single();
@@ -826,7 +835,7 @@ async function abrirPedidosEnviados() {
     supabaseClient
       .from('pedido_itens')
       .select(`
-        id, quantidade, preco_unitario_calculado, observacao, status, criado_em, criado_por,
+        id, quantidade, preco_unitario_calculado, observacao, status, criado_em, criado_por, numero_pedido,
         perfis ( nome ),
         itens_cardapio ( nome, tipo_montagem ),
         pedido_item_ingredientes ( foi_acrescimo, foi_substituicao, ingredientes ( nome ) )
@@ -865,7 +874,8 @@ async function abrirPedidosEnviados() {
 
   const htmlItens = agruparPedidosPorLeva(itens || []).map(leva => {
     const horario = new Date(leva.primeiroTempo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const cabecalho = leva.nomeAtendente ? `${horario} · Atendente: ${escapeHtml(leva.nomeAtendente)}` : horario;
+    const rotuloPedido = leva.numeroPedido ? `Pedido #${leva.numeroPedido} · ` : '';
+    const cabecalho = leva.nomeAtendente ? `${rotuloPedido}${horario} · Atendente: ${escapeHtml(leva.nomeAtendente)}` : `${rotuloPedido}${horario}`;
 
     const htmlItensLeva = leva.itens.map(pi => {
       const saboresNormais = pi.pedido_item_ingredientes.filter(s => !s.foi_acrescimo && !s.foi_substituicao).map(s => escapeHtml(s.ingredientes.nome)).join(', ');
@@ -914,25 +924,33 @@ async function abrirPedidosEnviados() {
 }
 
 // Agrupa os itens enviados em "levas" (uma leva = uma ação de "enviar
-// pedido"). Como cada item é salvo com um insert separado, os horários
-// não são idênticos — então agrupamos por: mesmo atendente + item
-// enviado a até 10s do anterior da mesma leva
+// pedido"). Usa o numero_pedido, salvo igual pra todos os itens do
+// mesmo envio — muito mais confiável que tentar adivinhar por horário.
+// Itens de antes dessa mudança (sem numero_pedido) caem no fallback
+// por aproximação de horário + mesmo atendente
 function agruparPedidosPorLeva(itens) {
   const levas = [];
   let levaAtual = null;
 
   for (const item of itens) {
     const tempo = new Date(item.criado_em).getTime();
-    const mesmoAtendente = levaAtual && item.criado_por === levaAtual.criadoPor;
-    const dentroDaJanela = levaAtual && (tempo - levaAtual.ultimoTempo) < 10000;
 
-    if (mesmoAtendente && dentroDaJanela) {
+    // Itens com numero_pedido preenchido (todo pedido novo, a partir de
+    // agora) agrupam com precisão total por esse número. Itens antigos,
+    // de antes dessa mudança, ainda podem vir sem numero_pedido — pra
+    // esses, mantém o agrupamento por aproximação como fallback
+    const mesmaLeva = levaAtual && item.numero_pedido && levaAtual.numeroPedido === item.numero_pedido;
+    const mesmoAtendenteEJanela = levaAtual && !item.numero_pedido && !levaAtual.numeroPedido
+      && item.criado_por === levaAtual.criadoPor && (tempo - levaAtual.ultimoTempo) < 10000;
+
+    if (mesmaLeva || mesmoAtendenteEJanela) {
       levaAtual.itens.push(item);
       levaAtual.ultimoTempo = tempo;
     } else {
       levaAtual = {
         criadoPor: item.criado_por,
         nomeAtendente: item.perfis?.nome,
+        numeroPedido: item.numero_pedido || null,
         primeiroTempo: tempo,
         ultimoTempo: tempo,
         itens: [item],
