@@ -134,8 +134,9 @@ input:focus, select:focus, textarea:focus {
    não sobrepõe carrinho/botão de fechar que já ficam ancorados no rodapé).
    ============================================================ */
 body.app-shell {
+  position: fixed; inset: 0;
   display: flex; flex-direction: column;
-  height: 100vh; height: 100dvh; overflow: hidden;
+  overflow: hidden;
 }
 .main-area { order: 1; flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 0; padding-top: env(safe-area-inset-top); }
 
@@ -163,12 +164,12 @@ body.app-shell {
 }
 
 @media (min-width: 860px) {
-  body.app-shell { flex-direction: row; height: 100vh; }
-  .main-area { order: 0; height: 100vh; padding-top: 0; }
+  body.app-shell { flex-direction: row; }
+  .main-area { order: 0; height: 100%; padding-top: 0; }
   #sidebar {
     order: 0;
     flex-direction: column; align-items: stretch; justify-content: flex-start;
-    width: 220px; height: 100vh; border-top: none; border-right: 1px solid var(--ink-line);
+    width: 220px; height: 100%; border-top: none; border-right: 1px solid var(--ink-line);
     padding: 24px 16px; flex-shrink: 0;
   }
   #sidebar .sidebar-logo { display: block; font-size: 17px; margin-bottom: 6px; }
