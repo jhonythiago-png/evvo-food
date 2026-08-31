@@ -935,13 +935,19 @@ async function confirmarAberturaCaixa() {
   }
 
   // Reseta a numeração das comandas — como o fechamento de caixa só é
-  // permitido sem nenhuma comanda aberta, é seguro reiniciar do #1 aqui
+  // permitido sem nenhuma comanda aberta, é seguro reiniciar do #1 aqui.
+  // Usa uma função de banco (RPC) em vez de update direto — mais confiável
+  // e cria a linha do contador automaticamente se ainda não existir
   const { error: erroReset } = await supabaseClient
-    .from('contadores_comanda')
-    .update({ ultimo_numero: 0 })
-    .eq('estabelecimento_id', estado.perfil.estabelecimento_id);
+    .rpc('fn_resetar_numeracao_comanda', { p_estabelecimento_id: estado.perfil.estabelecimento_id });
 
-  if (erroReset) console.error('Erro ao resetar numeração:', erroReset);
+  if (erroReset) {
+    console.error('Erro ao resetar numeração:', erroReset);
+    mostrarToast('Caixa aberto, mas a numeração NÃO resetou — avisa o suporte.', 'erro');
+    fecharModalAbrirCaixa();
+    await carregarStatusCaixa();
+    return;
+  }
 
   mostrarToast('Caixa aberto! 🔓');
   fecharModalAbrirCaixa();
