@@ -79,19 +79,48 @@ function selecionarPeriodoHistorico(periodo) {
   carregarHistorico();
 }
 
+// "Hoje" segue o TURNO do caixa, não a meia-noite do calendário —
+// assim, um turno que passa da meia-noite continua sendo "hoje"
+// inteiro, sem cortar as vendas em 2 dias diferentes
+async function buscarPeriodoTurnoMaisRecente() {
+  const { data, error } = await supabaseClient
+    .from('caixas_turno')
+    .select('aberto_em, fechado_em')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .order('aberto_em', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null; // nunca abriu caixa ainda — cai no fallback de meia-noite
+
+  return {
+    inicio: new Date(data.aberto_em),
+    fim: data.fechado_em ? new Date(data.fechado_em) : new Date(),
+  };
+}
+
 async function carregarHistorico() {
   const grid = document.getElementById('grid-historico');
   grid.innerHTML = '<div class="aviso-vazio">Carregando...</div>';
 
   const hoje = new Date();
-  const fim = hoje.toISOString();
-  let inicioData;
+  let inicioData, fimData;
+
   if (estado.periodoHistorico === 'hoje') {
-    inicioData = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    const periodoTurno = await buscarPeriodoTurnoMaisRecente();
+    if (periodoTurno) {
+      inicioData = periodoTurno.inicio;
+      fimData = periodoTurno.fim;
+    } else {
+      // Fallback: nunca abriu caixa ainda — usa meia-noite mesmo
+      inicioData = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      fimData = hoje;
+    }
   } else {
     inicioData = new Date(hoje);
     inicioData.setDate(inicioData.getDate() - 6);
     inicioData.setHours(0, 0, 0, 0);
+    fimData = hoje;
   }
 
   const { data, error } = await supabaseClient
@@ -103,7 +132,7 @@ async function carregarHistorico() {
     .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
     .eq('comandas.status', 'fechada')
     .gte('fechado_em', inicioData.toISOString())
-    .lte('fechado_em', fim)
+    .lte('fechado_em', fimData.toISOString())
     .order('fechado_em', { ascending: false })
     .limit(50);
 
