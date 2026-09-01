@@ -212,6 +212,13 @@
       <label>Preço total com 3 sabores (não é "extra" — é o valor final)</label>
       <input type="text" inputmode="decimal" id="input-item-preco-terceiro-sabor" placeholder="Ex: 17,00">
     </div>
+    <div class="campo">
+      <label>Onde esse item deve imprimir?</label>
+      <select id="input-item-imprime-em">
+        <option value="cozinha">Cozinha (precisa de preparo)</option>
+        <option value="caixa">Caixa (só entregar, ex: bebida pronta)</option>
+      </select>
+    </div>
     <div class="campo-checkbox">
       <input type="checkbox" id="input-item-destaque">
       <label for="input-item-destaque" style="margin:0;">Destaque ("Mais Pedido")</label>
