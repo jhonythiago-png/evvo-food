@@ -239,7 +239,7 @@ async function excluirIngrediente() {
 async function carregarItens() {
   const { data, error } = await supabaseClient
     .from('itens_cardapio')
-    .select('id, nome, descricao, preco_base, tipo_montagem, qtd_sabores_inclusos, preco_terceiro_sabor, destaque, disponivel, ordem_exibicao, categoria_id, categorias_cardapio(nome, ordem_exibicao)')
+    .select('id, nome, descricao, preco_base, tipo_montagem, qtd_sabores_inclusos, preco_terceiro_sabor, imprime_em, destaque, disponivel, ordem_exibicao, categoria_id, categorias_cardapio(nome, ordem_exibicao)')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
     .order('ordem_exibicao');
 
@@ -315,6 +315,7 @@ function abrirModalItem(itemId) {
   // diferença crua — é mais intuitivo pra editar depois
   const totalTresSabores = item ? Number(item.preco_base) + Number(item.preco_terceiro_sabor || 0) : null;
   document.getElementById('input-item-preco-terceiro-sabor').value = totalTresSabores ? String(totalTresSabores.toFixed(2)).replace('.', ',') : '';
+  document.getElementById('input-item-imprime-em').value = item?.imprime_em || 'cozinha';
   document.getElementById('input-item-destaque').checked = item?.destaque || false;
   document.getElementById('input-item-disponivel').checked = item ? item.disponivel : true;
 
@@ -452,6 +453,7 @@ async function salvarItem() {
   const tipoMontagem = document.getElementById('input-item-tipo').value;
   const qtdSaboresTexto = document.getElementById('input-item-qtd-sabores').value;
   const precoTerceiroSaborTexto = document.getElementById('input-item-preco-terceiro-sabor').value;
+  const imprimeEm = document.getElementById('input-item-imprime-em').value;
   const destaque = document.getElementById('input-item-destaque').checked;
   const disponivel = document.getElementById('input-item-disponivel').checked;
 
@@ -482,6 +484,7 @@ async function salvarItem() {
     tipo_montagem: tipoMontagem,
     qtd_sabores_inclusos: qtdSabores,
     preco_terceiro_sabor: precoTerceiroSabor,
+    imprime_em: imprimeEm,
     destaque,
     disponivel,
   };
