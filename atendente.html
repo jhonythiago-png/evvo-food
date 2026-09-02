@@ -226,7 +226,7 @@
     </div>
     <div class="linha" style="margin-top:8px;">
       <input type="text" id="input-pessoa-mesa" placeholder="Nome da pessoa (opcional, se dividir a conta)">
-      <button class="btn-primary" style="flex-shrink:0; padding:12px 18px;" onclick="abrirNovaComandaMesa()">Abrir</button>
+      <button id="btn-abrir-mesa" class="btn-primary" style="flex-shrink:0; padding:12px 18px;" onclick="abrirNovaComandaMesa()">Abrir</button>
     </div>
   </div>
 
@@ -234,7 +234,7 @@
     <h3>Nova comanda avulsa (balcão)</h3>
     <div class="linha">
       <input type="text" id="input-nome-cliente" placeholder="Nome do cliente (opcional)">
-      <button class="btn-primary" style="flex-shrink:0; padding:12px 18px;" onclick="abrirNovaComandaAvulsa()">Abrir</button>
+      <button id="btn-abrir-avulsa" class="btn-primary" style="flex-shrink:0; padding:12px 18px;" onclick="abrirNovaComandaAvulsa()">Abrir</button>
     </div>
   </div>
 
@@ -245,7 +245,7 @@
     <input type="text" id="input-entrega-endereco" placeholder="Endereço de entrega" style="margin-bottom:8px;">
     <div class="linha">
       <input type="text" inputmode="decimal" id="input-entrega-taxa" placeholder="Taxa de entrega (R$, opcional)">
-      <button class="btn-primary" style="flex-shrink:0; padding:12px 18px;" onclick="abrirNovaComandaEntrega()">Abrir</button>
+      <button id="btn-abrir-entrega" class="btn-primary" style="flex-shrink:0; padding:12px 18px;" onclick="abrirNovaComandaEntrega()">Abrir</button>
     </div>
   </div>
 
