@@ -197,18 +197,16 @@ async function carregarResumoReceitaDespesa() {
     qtdComandas = (receitaDias || []).reduce((s, r) => s + Number(r.qtd_comandas), 0);
   }
 
-  // Despesas e ajustes vêm de tabelas normais (não de view agrupada por
-  // dia), então dá pra usar o horário exato do turno direto nelas também
-  const dataInicioConsulta = estado.turnoPeriodo ? estado.turnoPeriodo.inicio.toISOString() : estado.dataInicio;
-  const dataFimConsulta = estado.turnoPeriodo ? estado.turnoPeriodo.fim.toISOString() : estado.dataFim + 'T23:59:59';
-
+  // Despesas e Ajustes de caixa são lançados manualmente, sem ligação com
+  // comanda nem turno — diferente da Receita, eles sempre seguem o
+  // CALENDÁRIO (dia normal), nunca o horário do turno
   const { data: despesasPagas } = await supabaseClient
     .from('despesas')
     .select('valor')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
     .eq('status', 'pago')
-    .gte('data_pagamento', dataInicioConsulta)
-    .lte('data_pagamento', dataFimConsulta);
+    .gte('data_pagamento', estado.dataInicio)
+    .lte('data_pagamento', estado.dataFim);
 
   const despesasTotal = (despesasPagas || []).reduce((s, d) => s + Number(d.valor), 0);
 
@@ -217,8 +215,8 @@ async function carregarResumoReceitaDespesa() {
     .from('ajustes_caixa')
     .select('valor, criado_em')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-    .gte('criado_em', dataInicioConsulta)
-    .lte('criado_em', dataFimConsulta);
+    .gte('criado_em', estado.dataInicio)
+    .lte('criado_em', estado.dataFim + 'T23:59:59');
 
   const ajustesTotal = (ajustesPeriodo || []).reduce((s, a) => s + Number(a.valor), 0);
 
