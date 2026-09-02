@@ -7,7 +7,6 @@ const estado = {
   periodoAtivo: 'hoje',
   dataInicio: null,
   dataFim: null,
-  turnoPeriodo: null,
   despesas: [],
   sangrias: [],
   despesaEmEdicaoId: null,
@@ -94,22 +93,12 @@ function selecionarPeriodo(preset) {
 
   estado.dataInicio = inicio;
   estado.dataFim = fim;
-  estado.turnoPeriodo = null; // limpa — só é preenchido de novo se for "hoje"
 
   document.querySelectorAll('.periodo-chip').forEach(el => el.classList.remove('on'));
   document.getElementById(`chip-${preset}`)?.classList.add('on');
   document.getElementById('periodo-personalizado').style.display = 'none';
 
-  if (preset === 'hoje') {
-    // Busca o período do turno ANTES de carregar os relatórios, pra já
-    // usar o horário certo (não a meia-noite) na primeira carga
-    buscarPeriodoTurnoMaisRecente().then(periodo => {
-      estado.turnoPeriodo = periodo;
-      carregarRelatorios();
-    });
-  } else {
-    carregarRelatorios();
-  }
+  carregarRelatorios();
 }
 
 function mostrarPeriodoPersonalizado() {
@@ -124,7 +113,6 @@ function atualizarPeriodoPersonalizado() {
   if (!inicio || !fim) return;
   estado.dataInicio = inicio;
   estado.dataFim = fim;
-  estado.turnoPeriodo = null;
   carregarRelatorios();
 }
 
@@ -135,26 +123,6 @@ function formatarDataISO(data) {
 function formatarDataBR(dataISO) {
   const [ano, mes, dia] = dataISO.split('-');
   return `${dia}/${mes}/${ano}`;
-}
-
-// "Hoje" segue o TURNO do caixa, não a meia-noite do calendário —
-// assim, um turno que passa da meia-noite continua sendo "hoje"
-// inteiro, sem cortar as vendas em 2 dias diferentes
-async function buscarPeriodoTurnoMaisRecente() {
-  const { data, error } = await supabaseClient
-    .from('caixas_turno')
-    .select('aberto_em, fechado_em')
-    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-    .order('aberto_em', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return null; // nunca abriu caixa ainda — cai no fallback de meia-noite
-
-  return {
-    inicio: new Date(data.aberto_em),
-    fim: data.fechado_em ? new Date(data.fechado_em) : new Date(),
-  };
 }
 
 // ------------------------------------------------------------
@@ -172,34 +140,18 @@ async function carregarResumoReceitaDespesa() {
   let receitaTotal = 0;
   let qtdComandas = 0;
 
-  if (estado.periodoAtivo === 'hoje' && estado.turnoPeriodo) {
-    // "Hoje" segue o turno de verdade (não a meia-noite) — a view
-    // receita_diaria agrupa por dia de calendário, então pra esse caso
-    // específico consultamos os fechamentos direto, com o horário exato
-    const { data: fechamentosHoje } = await supabaseClient
-      .from('fechamentos')
-      .select('valor_total, comandas!inner(estabelecimento_id)')
-      .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
-      .gte('fechado_em', estado.turnoPeriodo.inicio.toISOString())
-      .lte('fechado_em', estado.turnoPeriodo.fim.toISOString());
+  const { data: receitaDias } = await supabaseClient
+    .from('receita_diaria')
+    .select('receita_total, qtd_comandas')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('data', estado.dataInicio)
+    .lte('data', estado.dataFim);
 
-    receitaTotal = (fechamentosHoje || []).reduce((s, f) => s + Number(f.valor_total), 0);
-    qtdComandas = (fechamentosHoje || []).length;
-  } else {
-    const { data: receitaDias } = await supabaseClient
-      .from('receita_diaria')
-      .select('receita_total, qtd_comandas')
-      .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-      .gte('data', estado.dataInicio)
-      .lte('data', estado.dataFim);
-
-    receitaTotal = (receitaDias || []).reduce((s, r) => s + Number(r.receita_total), 0);
-    qtdComandas = (receitaDias || []).reduce((s, r) => s + Number(r.qtd_comandas), 0);
-  }
+  receitaTotal = (receitaDias || []).reduce((s, r) => s + Number(r.receita_total), 0);
+  qtdComandas = (receitaDias || []).reduce((s, r) => s + Number(r.qtd_comandas), 0);
 
   // Despesas e Ajustes de caixa são lançados manualmente, sem ligação com
-  // comanda nem turno — diferente da Receita, eles sempre seguem o
-  // CALENDÁRIO (dia normal), nunca o horário do turno
+  // comanda — sempre seguem o CALENDÁRIO (dia normal)
   const { data: despesasPagas } = await supabaseClient
     .from('despesas')
     .select('valor')
@@ -232,40 +184,15 @@ async function carregarResumoReceitaDespesa() {
 async function carregarPagamentosPorForma() {
   let totais = {};
 
-  if (estado.periodoAtivo === 'hoje' && estado.turnoPeriodo) {
-    // Mesmo motivo do resumo — bypassa a view agrupada por dia. Como
-    // pagamentos → fechamentos → comandas é 2 níveis de profundidade,
-    // busca em 2 passos (filtro aninhado direto nem sempre funciona certo)
-    const { data: fechamentosHoje } = await supabaseClient
-      .from('fechamentos')
-      .select('id, comandas!inner(estabelecimento_id)')
-      .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
-      .gte('fechado_em', estado.turnoPeriodo.inicio.toISOString())
-      .lte('fechado_em', estado.turnoPeriodo.fim.toISOString());
+  const { data } = await supabaseClient
+    .from('pagamentos_por_dia')
+    .select('forma_pagamento, valor_total')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('data', estado.dataInicio)
+    .lte('data', estado.dataFim);
 
-    const idsFechamentos = (fechamentosHoje || []).map(f => f.id);
-
-    if (idsFechamentos.length > 0) {
-      const { data: pagamentosHoje } = await supabaseClient
-        .from('pagamentos')
-        .select('forma_pagamento, valor')
-        .in('fechamento_id', idsFechamentos);
-
-      for (const p of pagamentosHoje || []) {
-        totais[p.forma_pagamento] = (totais[p.forma_pagamento] || 0) + Number(p.valor);
-      }
-    }
-  } else {
-    const { data } = await supabaseClient
-      .from('pagamentos_por_dia')
-      .select('forma_pagamento, valor_total')
-      .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-      .gte('data', estado.dataInicio)
-      .lte('data', estado.dataFim);
-
-    for (const linha of data || []) {
-      totais[linha.forma_pagamento] = (totais[linha.forma_pagamento] || 0) + Number(linha.valor_total);
-    }
+  for (const linha of data || []) {
+    totais[linha.forma_pagamento] = (totais[linha.forma_pagamento] || 0) + Number(linha.valor_total);
   }
 
   const container = document.getElementById('lista-pagamentos-forma');
@@ -298,37 +225,17 @@ async function carregarPagamentosPorForma() {
 async function carregarProdutosMaisVendidos() {
   let totais = {};
 
-  if (estado.periodoAtivo === 'hoje' && estado.turnoPeriodo) {
-    // Bypassa a view agrupada por dia — consulta os itens de pedido
-    // direto, dentro do horário exato do turno
-    const { data: itensHoje } = await supabaseClient
-      .from('pedido_itens')
-      .select('quantidade, preco_unitario_calculado, criado_em, itens_cardapio(nome), comandas!inner(estabelecimento_id)')
-      .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
-      .neq('status', 'cancelado')
-      .gte('criado_em', estado.turnoPeriodo.inicio.toISOString())
-      .lte('criado_em', estado.turnoPeriodo.fim.toISOString());
+  const { data } = await supabaseClient
+    .from('produtos_mais_vendidos')
+    .select('item_nome, quantidade_total, receita_total')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('data', estado.dataInicio)
+    .lte('data', estado.dataFim);
 
-    for (const item of itensHoje || []) {
-      const nome = item.itens_cardapio?.nome;
-      if (!nome) continue;
-      if (!totais[nome]) totais[nome] = { quantidade: 0, receita: 0 };
-      totais[nome].quantidade += Number(item.quantidade);
-      totais[nome].receita += Number(item.preco_unitario_calculado) * Number(item.quantidade);
-    }
-  } else {
-    const { data } = await supabaseClient
-      .from('produtos_mais_vendidos')
-      .select('item_nome, quantidade_total, receita_total')
-      .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-      .gte('data', estado.dataInicio)
-      .lte('data', estado.dataFim);
-
-    for (const linha of data || []) {
-      if (!totais[linha.item_nome]) totais[linha.item_nome] = { quantidade: 0, receita: 0 };
-      totais[linha.item_nome].quantidade += Number(linha.quantidade_total);
-      totais[linha.item_nome].receita += Number(linha.receita_total);
-    }
+  for (const linha of data || []) {
+    if (!totais[linha.item_nome]) totais[linha.item_nome] = { quantidade: 0, receita: 0 };
+    totais[linha.item_nome].quantidade += Number(linha.quantidade_total);
+    totais[linha.item_nome].receita += Number(linha.receita_total);
   }
 
   const ranking = Object.entries(totais)
