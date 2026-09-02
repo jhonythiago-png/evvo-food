@@ -1071,20 +1071,12 @@ async function abrirModalFecharCaixa() {
   const totalGeral = Object.values(totaisPorForma).reduce((s, v) => s + v, 0);
   const dinheiroRecebido = totaisPorForma['dinheiro'] || 0;
 
-  // Ajustes de caixa registrados durante o turno também entram na conferência
-  const { data: ajustes } = await supabaseClient
-    .from('ajustes_caixa')
-    .select('valor')
-    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-    .gte('criado_em', inicio)
-    .lte('criado_em', fim);
-
-  const somaAjustes = (ajustes || []).reduce((s, a) => s + Number(a.valor), 0);
-
-  const valorEsperado = Number(estado.caixaAtual.valor_abertura) + dinheiroRecebido + somaAjustes;
+  // Ajuste de caixa NÃO entra aqui — é um lançamento de saldo geral da
+  // empresa (Financeiro), não uma diferença física de dinheiro na gaveta
+  const valorEsperado = Number(estado.caixaAtual.valor_abertura) + dinheiroRecebido;
 
   // Guarda esses valores calculados no estado, pra usar quando confirmar o fechamento
-  estado.caixaAtual._calculo = { totaisPorForma, totalGeral, dinheiroRecebido, somaAjustes, valorEsperado };
+  estado.caixaAtual._calculo = { totaisPorForma, totalGeral, dinheiroRecebido, valorEsperado };
 
   document.getElementById('fechar-caixa-resumo-formas').innerHTML = `
     ${Object.entries(totaisPorForma).map(([forma, valor]) => `
@@ -1107,10 +1099,6 @@ async function abrirModalFecharCaixa() {
     <div class="fechar-caixa-linha">
       <span>+ Dinheiro recebido no turno</span>
       <span>R$ ${dinheiroRecebido.toFixed(2).replace('.', ',')}</span>
-    </div>
-    <div class="fechar-caixa-linha">
-      <span>+ Ajustes de caixa</span>
-      <span>R$ ${somaAjustes.toFixed(2).replace('.', ',')}</span>
     </div>
     <div class="fechar-caixa-linha esperado">
       <span>= Esperado na gaveta</span>
