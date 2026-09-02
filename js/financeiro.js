@@ -197,22 +197,12 @@ async function carregarResumoReceitaDespesa() {
 
   const despesasTotal = (despesasPagas || []).reduce((s, d) => s + Number(d.valor), 0);
 
-  // Ajustes de caixa (sobrou/faltou/retirada) — entram no Saldo, mas NUNCA na Receita
-  const { data: ajustesPeriodo } = await supabaseClient
-    .from('ajustes_caixa')
-    .select('valor, criado_em')
-    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
-    .gte('criado_em', estado.dataInicio)
-    .lte('criado_em', estado.dataFim + 'T23:59:59');
-
-  const ajustesTotal = (ajustesPeriodo || []).reduce((s, a) => s + Number(a.valor), 0);
-
-  const saldo = receitaTotal - despesasTotal + ajustesTotal;
+  // Ajustes de caixa não entram mais no resumo por período (o card
+  // "Saldo" foi removido por já ser redundante com o Saldo Geral, lá
+  // em cima, que soma tudo desde o início)
 
   document.getElementById('card-receita').textContent = formatarMoeda(receitaTotal);
   document.getElementById('card-despesas').textContent = formatarMoeda(despesasTotal);
-  document.getElementById('card-saldo').textContent = formatarMoeda(saldo);
-  document.getElementById('card-saldo').className = 'card-valor ' + (saldo >= 0 ? 'positivo' : 'negativo');
   document.getElementById('card-comandas').textContent = qtdComandas;
 }
 
