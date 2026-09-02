@@ -402,12 +402,22 @@ function abrirModalItem(itemId) {
   estado.ingredientesRemovidos = [];
   estado.acrescimosSelecionados = [];
   estado.observacaoAtual = '';
+  estado.quantidadeModal = 1;
 
   document.getElementById('modal-item-nome').textContent = item.nome;
   document.getElementById('modal-item-preco-base').textContent = `R$ ${item.preco_base.toFixed(2).replace('.', ',')}`;
+  document.getElementById('modal-quantidade-valor').textContent = '1';
 
   renderCorpoModal();
   document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+// Ajusta a quantidade que vai ser adicionada de uma vez (mín. 1) —
+// evita ter que abrir o modal várias vezes pro mesmo item repetido
+function alterarQuantidadeModal(delta) {
+  estado.quantidadeModal = Math.max(1, (estado.quantidadeModal || 1) + delta);
+  document.getElementById('modal-quantidade-valor').textContent = estado.quantidadeModal;
+  atualizarTotalModal();
 }
 
 function fecharModal() {
@@ -570,7 +580,8 @@ function atualizarTotalModal() {
     });
   }
 
-  document.getElementById('modal-total').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+  const quantidade = estado.quantidadeModal || 1;
+  document.getElementById('modal-total').textContent = `R$ ${(total * quantidade).toFixed(2).replace('.', ',')}`;
 }
 
 function confirmarAdicaoAoCarrinho() {
@@ -651,7 +662,7 @@ function confirmarAdicaoAoCarrinho() {
     observacao = obsExtra || null;
   }
 
-  adicionarAoCarrinho({ item, nomeExibicao, precoUnitario, observacao, sabores });
+  adicionarAoCarrinho({ item, nomeExibicao, precoUnitario, observacao, sabores }, estado.quantidadeModal || 1);
   fecharModal();
 }
 
@@ -663,16 +674,16 @@ function chaveLinha(linha) {
   return `${linha.item.id}|${linha.observacao || ''}|${saboresOrdenados}`;
 }
 
-function adicionarAoCarrinho(linha) {
+function adicionarAoCarrinho(linha, quantidade = 1) {
   const chave = chaveLinha(linha);
   const existente = estado.carrinho.find(l => chaveLinha(l) === chave);
   if (existente) {
-    existente.quantidade += 1;
+    existente.quantidade += quantidade;
   } else {
-    estado.carrinho.push({ ...linha, quantidade: 1 });
+    estado.carrinho.push({ ...linha, quantidade });
   }
   renderCarrinho();
-  mostrarToast(`${linha.item.nome} adicionado`);
+  mostrarToast(`${quantidade > 1 ? `${quantidade}× ` : ''}${linha.item.nome} adicionado`);
 }
 
 function removerDoCarrinho(index) {
