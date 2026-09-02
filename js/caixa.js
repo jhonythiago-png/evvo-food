@@ -330,7 +330,7 @@ function rotuloComanda(c) {
     return c.identificador_pessoa ? `Mesa ${c.numero_mesa} · ${escapeHtml(c.identificador_pessoa)}` : `Mesa ${c.numero_mesa}`;
   }
   if (c.tipo === 'entrega') return `Entrega · ${escapeHtml(c.nome_cliente) || ''}`;
-  return escapeHtml(c.nome_cliente) || 'Balcão';
+  return c.nome_cliente ? `Balcão · ${escapeHtml(c.nome_cliente)}` : 'Balcão';
 }
 
 function tempoAberta(dataIso) {
