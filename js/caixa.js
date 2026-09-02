@@ -1020,6 +1020,7 @@ async function abrirModalFecharCaixa() {
   // Soma de todas as taxas de entrega do turno — repasse pro motoboy,
   // independente de como o cliente pagou (dinheiro, pix, cartão...)
   const totalRepasseEntrega = (fechamentosNoTurno || []).reduce((s, f) => s + Number(f.taxa_entrega_valor || 0), 0);
+  const qtdEntregas = (fechamentosNoTurno || []).filter(f => Number(f.taxa_entrega_valor || 0) > 0).length;
   const blocoEntrega = document.getElementById('fechar-caixa-bloco-entrega');
   if (totalRepasseEntrega > 0) {
     blocoEntrega.style.display = 'block';
@@ -1027,6 +1028,7 @@ async function abrirModalFecharCaixa() {
       <div class="bloco-repasse-entrega">
         <div class="bloco-repasse-entrega-titulo">🛵 Repasse de entrega (terceirizada)</div>
         <div class="bloco-repasse-entrega-valor">R$ ${totalRepasseEntrega.toFixed(2).replace('.', ',')}</div>
+        <div class="bloco-repasse-entrega-qtd">${qtdEntregas} entrega${qtdEntregas > 1 ? 's' : ''} no turno</div>
         <div class="bloco-repasse-entrega-aviso">Esse valor já está incluso no que foi recebido acima — mas não é lucro seu, é repasse pro motoboy.</div>
         <button class="btn-lancar-despesa-entrega" onclick="abrirModalDespesaEntrega(${totalRepasseEntrega})">+ Lançar despesa do motoboy agora</button>
       </div>
@@ -1383,6 +1385,7 @@ async function abrirVerTurno(turnoId) {
 
   const idsFechamentos = (fechamentosNoTurno || []).map(f => f.id);
   const totalRepasseEntrega = (fechamentosNoTurno || []).reduce((s, f) => s + Number(f.taxa_entrega_valor || 0), 0);
+  const qtdEntregas = (fechamentosNoTurno || []).filter(f => Number(f.taxa_entrega_valor || 0) > 0).length;
   let pagamentos = [];
   if (idsFechamentos.length > 0) {
     const { data } = await supabaseClient.from('pagamentos').select('forma_pagamento, valor').in('fechamento_id', idsFechamentos);
@@ -1417,6 +1420,7 @@ async function abrirVerTurno(turnoId) {
       <div class="bloco-repasse-entrega" style="margin-top:14px;">
         <div class="bloco-repasse-entrega-titulo">🛵 Repasse de entrega (terceirizada)</div>
         <div class="bloco-repasse-entrega-valor">R$ ${totalRepasseEntrega.toFixed(2).replace('.', ',')}</div>
+        <div class="bloco-repasse-entrega-qtd">${qtdEntregas} entrega${qtdEntregas > 1 ? 's' : ''} no turno</div>
         <div class="bloco-repasse-entrega-aviso">Já incluso no total recebido acima — não é lucro seu, é repasse pro motoboy.</div>
       </div>
     ` : ''}
