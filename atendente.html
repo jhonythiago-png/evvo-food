@@ -129,6 +129,19 @@
   #modal-observacao-extra { margin-top: 4px; }
   #modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; gap: 12px; }
   #modal-total { font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+  .modal-quantidade-linha {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; margin-top: 8px; border-top: 1px solid var(--ink-line);
+  }
+  .modal-quantidade-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+  .modal-quantidade-stepper { display: flex; align-items: center; gap: 14px; }
+  .modal-quantidade-stepper button {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--ink-line);
+    color: var(--text-primary); font-size: 18px; font-weight: 700; line-height: 1;
+  }
+  .modal-quantidade-stepper span {
+    font-family: var(--font-display); font-size: 17px; font-weight: 700; min-width: 20px; text-align: center;
+  }
   #modal-footer button { flex-shrink: 0; }
   .modal-fechar { position: absolute; top: 16px; right: 16px; font-size: 20px; color: var(--text-muted); }
 
@@ -297,6 +310,14 @@
     <div id="modal-item-nome">—</div>
     <div id="modal-item-preco-base">—</div>
     <div id="modal-corpo"></div>
+    <div class="modal-quantidade-linha">
+      <span class="modal-quantidade-label">Quantidade</span>
+      <div class="modal-quantidade-stepper">
+        <button type="button" onclick="alterarQuantidadeModal(-1)">−</button>
+        <span id="modal-quantidade-valor">1</span>
+        <button type="button" onclick="alterarQuantidadeModal(1)">+</button>
+      </div>
+    </div>
     <div id="modal-footer">
       <span id="modal-total">R$ 0,00</span>
       <button class="btn-primary" style="flex:1;" onclick="confirmarAdicaoAoCarrinho()">Adicionar ao pedido</button>
