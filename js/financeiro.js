@@ -67,6 +67,41 @@ async function iniciar() {
   selecionarPeriodo('hoje');
   await carregarDespesas();
   await carregarSangrias();
+  await carregarSaldoGeral();
+}
+
+// ------------------------------------------------------------
+// Saldo Geral — total acumulado da empresa desde o início, sem
+// depender de nenhum filtro de período (sempre soma tudo)
+// ------------------------------------------------------------
+async function carregarSaldoGeral() {
+  const { data: receitaDias } = await supabaseClient
+    .from('receita_diaria')
+    .select('receita_total')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id);
+
+  const receitaTotal = (receitaDias || []).reduce((s, r) => s + Number(r.receita_total), 0);
+
+  const { data: despesasPagas } = await supabaseClient
+    .from('despesas')
+    .select('valor')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .eq('status', 'pago');
+
+  const despesasTotal = (despesasPagas || []).reduce((s, d) => s + Number(d.valor), 0);
+
+  const { data: ajustesTodos } = await supabaseClient
+    .from('ajustes_caixa')
+    .select('valor')
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id);
+
+  const ajustesTotal = (ajustesTodos || []).reduce((s, a) => s + Number(a.valor), 0);
+
+  const saldoGeral = receitaTotal - despesasTotal + ajustesTotal;
+
+  const el = document.getElementById('card-saldo-geral');
+  el.textContent = formatarMoeda(saldoGeral);
+  el.className = 'card-saldo-geral-valor ' + (saldoGeral >= 0 ? 'positivo' : 'negativo');
 }
 
 // ------------------------------------------------------------
@@ -345,6 +380,7 @@ function confirmarExcluirDespesa(despesaId) {
       mostrarToast('Despesa excluída.');
       await carregarDespesas();
       carregarRelatorios();
+      carregarSaldoGeral();
     }
   );
 }
@@ -393,6 +429,7 @@ async function salvarDespesa() {
   fecharModalDespesa();
   await carregarDespesas();
   carregarRelatorios();
+  carregarSaldoGeral();
 }
 
 // ------------------------------------------------------------
@@ -478,6 +515,7 @@ async function salvarSangria() {
   fecharModalSangria();
   await carregarSangrias();
   carregarRelatorios(); // recalcula o Saldo já incluindo esse ajuste
+  carregarSaldoGeral();
 }
 
 iniciar();

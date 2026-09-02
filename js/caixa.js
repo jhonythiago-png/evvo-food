@@ -1200,7 +1200,7 @@ async function abrirHistoricoCaixa() {
 
   const { data, error } = await supabaseClient
     .from('caixas_turno')
-    .select('id, status, aberto_em, valor_abertura, fechado_em, valor_contado, valor_esperado, diferenca')
+    .select('id, status, aberto_em, valor_abertura, fechado_em, valor_contado, valor_esperado, diferenca, aberto_por, fechado_por')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
     .order('aberto_em', { ascending: false })
     .limit(30);
@@ -1255,7 +1255,10 @@ function renderHistoricoCaixa() {
           Esperado R$ ${Number(c.valor_esperado).toFixed(2).replace('.', ',')} · Contado R$ ${Number(c.valor_contado).toFixed(2).replace('.', ',')}
         </div>
         <div class="caixa-turno-dif ${classeDif}">${textoDif}</div>
-        <button class="btn-reimprimir" style="margin-top:8px;" onclick="reimprimirFechamentoCaixa('${c.id}')">🖨️ Reimprimir</button>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn-reimprimir" style="flex:1;" onclick="abrirVerTurno('${c.id}')">👁️ Ver</button>
+          <button class="btn-reimprimir" style="flex:1;" onclick="reimprimirFechamentoCaixa('${c.id}')">🖨️ Reimprimir</button>
+        </div>
       </div>
     `;
   }).join('');
@@ -1344,6 +1347,80 @@ async function salvarDespesaEntrega() {
 
   mostrarToast('Despesa lançada! 🛵');
   fecharModalDespesaEntrega();
+}
+
+// ------------------------------------------------------------
+// Ver detalhes de um turno específico, sem precisar imprimir —
+// útil quando não está perto da impressora
+// ------------------------------------------------------------
+const NOMES_FORMA_PAGAMENTO_TURNO = { dinheiro: 'Dinheiro', debito: 'Cartão Débito', credito: 'Cartão Crédito', pix: 'Pix' };
+
+async function abrirVerTurno(turnoId) {
+  document.getElementById('modal-ver-turno-overlay').style.display = 'flex';
+  document.getElementById('ver-turno-conteudo').innerHTML = '<div class="aviso-vazio-pequeno">Carregando...</div>';
+
+  const turno = estado.historicoCaixas.find(c => c.id === turnoId);
+  if (!turno) return;
+
+  document.getElementById('ver-turno-titulo').textContent = turno.status === 'aberto' ? 'Turno em andamento' : 'Turno fechado';
+
+  // Nome de quem abriu e quem fechou
+  const { data: perfis } = await supabaseClient
+    .from('perfis')
+    .select('id, nome')
+    .in('id', [turno.aberto_por, turno.fechado_por].filter(Boolean));
+
+  const nomePorId = Object.fromEntries((perfis || []).map(p => [p.id, p.nome]));
+
+  // Total recebido por forma de pagamento, dentro do período do turno
+  const fimPeriodo = turno.fechado_em || new Date().toISOString();
+  const { data: fechamentosNoTurno } = await supabaseClient
+    .from('fechamentos')
+    .select('id, comandas!inner(estabelecimento_id)')
+    .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
+    .gte('fechado_em', turno.aberto_em)
+    .lte('fechado_em', fimPeriodo);
+
+  const idsFechamentos = (fechamentosNoTurno || []).map(f => f.id);
+  let pagamentos = [];
+  if (idsFechamentos.length > 0) {
+    const { data } = await supabaseClient.from('pagamentos').select('forma_pagamento, valor').in('fechamento_id', idsFechamentos);
+    pagamentos = data || [];
+  }
+
+  const totaisPorForma = {};
+  for (const p of pagamentos) totaisPorForma[p.forma_pagamento] = (totaisPorForma[p.forma_pagamento] || 0) + Number(p.valor);
+  const totalGeral = Object.values(totaisPorForma).reduce((s, v) => s + v, 0);
+
+  const dataAbertura = new Date(turno.aberto_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const dataFechamento = turno.fechado_em ? new Date(turno.fechado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : null;
+
+  const linhasFormas = Object.entries(totaisPorForma).map(([forma, valor]) => `
+    <div class="fechar-caixa-linha">
+      <span>${NOMES_FORMA_PAGAMENTO_TURNO[forma] || forma}</span>
+      <span>R$ ${valor.toFixed(2).replace('.', ',')}</span>
+    </div>
+  `).join('') || '<div class="aviso-vazio-pequeno">Nenhum pagamento nesse turno.</div>';
+
+  document.getElementById('ver-turno-conteudo').innerHTML = `
+    <div class="fechar-caixa-linha"><span>Abertura</span><span>${dataAbertura}</span></div>
+    <div class="fechar-caixa-linha"><span>Por</span><span>${escapeHtml(nomePorId[turno.aberto_por] || '—')}</span></div>
+    ${dataFechamento ? `
+      <div class="fechar-caixa-linha"><span>Fechamento</span><span>${dataFechamento}</span></div>
+      <div class="fechar-caixa-linha"><span>Por</span><span>${escapeHtml(nomePorId[turno.fechado_por] || '—')}</span></div>
+    ` : ''}
+    <div class="fechar-caixa-secao-label">Resumo do turno</div>
+    ${linhasFormas}
+    <div class="fechar-caixa-linha total"><span>Total recebido</span><span>R$ ${totalGeral.toFixed(2).replace('.', ',')}</span></div>
+    <div class="fechar-caixa-secao-label">Conferência de caixa</div>
+    <div class="fechar-caixa-linha"><span>Troco inicial</span><span>R$ ${Number(turno.valor_abertura).toFixed(2).replace('.', ',')}</span></div>
+    ${turno.valor_esperado != null ? `<div class="fechar-caixa-linha"><span>Esperado na gaveta</span><span>R$ ${Number(turno.valor_esperado).toFixed(2).replace('.', ',')}</span></div>` : ''}
+    ${turno.valor_contado != null ? `<div class="fechar-caixa-linha"><span>Contado na gaveta</span><span>R$ ${Number(turno.valor_contado).toFixed(2).replace('.', ',')}</span></div>` : ''}
+  `;
+}
+
+function fecharVerTurno() {
+  document.getElementById('modal-ver-turno-overlay').style.display = 'none';
 }
 
 iniciar();
