@@ -877,9 +877,16 @@ async function confirmarFechamento() {
 
   } catch (erro) {
     console.error(erro);
-    mostrarToast('Erro ao processar. Tente de novo.', 'erro');
-    btn.disabled = false;
-    btn.textContent = ehSaidaEntrega ? 'Confirmar saída pra entrega' : 'Fechar conta';
+    // Código 23505 = violação de restrição única — significa que essa
+    // comanda já tinha sido fechada antes (a trava do banco pegou isso)
+    if (erro.code === '23505') {
+      mostrarToast('Essa comanda já foi fechada antes. Confere no Histórico.', 'erro');
+      fecharTelaFechamento();
+    } else {
+      mostrarToast('Erro ao processar. Tente de novo.', 'erro');
+      btn.disabled = false;
+      btn.textContent = ehSaidaEntrega ? 'Confirmar saída pra entrega' : 'Fechar conta';
+    }
   }
 }
 
@@ -947,6 +954,28 @@ function fecharModalAbrirCaixa() {
 }
 
 async function confirmarAberturaCaixa() {
+  // Nunca deixa abrir um caixa novo se já tiver outro aberto — evita
+  // resetar a numeração no meio do dia sem querer, criando comandas
+  // duplicadas com o mesmo número
+  const { count: qtdJaAberto, error: erroCheck } = await supabaseClient
+    .from('caixas_turno')
+    .select('id', { count: 'exact', head: true })
+    .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
+    .eq('status', 'aberto');
+
+  if (erroCheck) {
+    mostrarToast('Erro ao verificar caixa.', 'erro');
+    console.error(erroCheck);
+    return;
+  }
+
+  if (qtdJaAberto > 0) {
+    mostrarToast('Já existe um caixa aberto! Fecha o turno atual antes de abrir outro.', 'erro');
+    fecharModalAbrirCaixa();
+    await carregarStatusCaixa();
+    return;
+  }
+
   const valorTexto = document.getElementById('input-abrir-caixa-valor').value;
   const valor = parseFloat((valorTexto || '0').replace(',', '.')) || 0;
 

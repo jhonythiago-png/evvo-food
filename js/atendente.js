@@ -266,18 +266,36 @@ async function selecionarComanda(comandaId) {
 }
 
 async function abrirNovaComandaMesa() {
+  const btn = document.getElementById('btn-abrir-mesa');
+  if (btn.disabled) return; // já está processando um clique anterior — ignora
   const numeroMesa = document.getElementById('input-numero-mesa').value.trim();
   const pessoa = formatarTitulo(document.getElementById('input-pessoa-mesa').value.trim());
   if (!numeroMesa) { mostrarToast('Digite o número da mesa.', 'erro'); return; }
-  await criarComanda({ tipo: 'mesa', numero_mesa: numeroMesa, identificador_pessoa: pessoa || null });
+
+  btn.disabled = true;
+  try {
+    await criarComanda({ tipo: 'mesa', numero_mesa: numeroMesa, identificador_pessoa: pessoa || null });
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function abrirNovaComandaAvulsa() {
+  const btn = document.getElementById('btn-abrir-avulsa');
+  if (btn.disabled) return;
   const nomeCliente = formatarTitulo(document.getElementById('input-nome-cliente').value.trim());
-  await criarComanda({ tipo: 'avulsa', nome_cliente: nomeCliente || null });
+
+  btn.disabled = true;
+  try {
+    await criarComanda({ tipo: 'avulsa', nome_cliente: nomeCliente || null });
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function abrirNovaComandaEntrega() {
+  const btn = document.getElementById('btn-abrir-entrega');
+  if (btn.disabled) return;
   const nomeCliente = formatarTitulo(document.getElementById('input-entrega-nome-cliente').value.trim());
   const telefone = document.getElementById('input-entrega-telefone').value.trim();
   const endereco = formatarTitulo(document.getElementById('input-entrega-endereco').value.trim());
@@ -288,19 +306,24 @@ async function abrirNovaComandaEntrega() {
 
   const taxaEntrega = parseFloat((taxaTexto || '0').replace(',', '.')) || 0;
 
-  await criarComanda({
-    tipo: 'entrega',
-    nome_cliente: nomeCliente,
-    telefone_contato: telefone || null,
-    endereco_entrega: endereco,
-    taxa_entrega: taxaEntrega,
-    status_entrega: 'preparando',
-  });
+  btn.disabled = true;
+  try {
+    await criarComanda({
+      tipo: 'entrega',
+      nome_cliente: nomeCliente,
+      telefone_contato: telefone || null,
+      endereco_entrega: endereco,
+      taxa_entrega: taxaEntrega,
+      status_entrega: 'preparando',
+    });
 
-  document.getElementById('input-entrega-nome-cliente').value = '';
-  document.getElementById('input-entrega-telefone').value = '';
-  document.getElementById('input-entrega-endereco').value = '';
-  document.getElementById('input-entrega-taxa').value = '';
+    document.getElementById('input-entrega-nome-cliente').value = '';
+    document.getElementById('input-entrega-telefone').value = '';
+    document.getElementById('input-entrega-endereco').value = '';
+    document.getElementById('input-entrega-taxa').value = '';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function criarComanda(dados) {
@@ -733,20 +756,17 @@ async function enviarPedido() {
     }
 
     // Se essa comanda ainda não tem número (é o primeiro pedido dela),
-    // atribui agora — ANTES de mandar os itens, pra já sair certo no
-    // cupom da cozinha, sem risco de corrida entre as duas ações
+    // atribui agora — numa função só, atômica (pegar o número e gravar
+    // na comanda acontecem juntos, no banco, sem risco de uma falha de
+    // rede no meio deixar um número "queimado" sem uso)
     if (!estado.comandaAtual.numero_sequencial) {
       const { data: numero, error: erroNumero } = await supabaseClient
-        .rpc('fn_proximo_numero_comanda', { p_estabelecimento_id: estado.perfil.estabelecimento_id });
+        .rpc('fn_atribuir_numero_comanda', {
+          p_comanda_id: estado.comandaAtual.id,
+          p_estabelecimento_id: estado.perfil.estabelecimento_id,
+        });
 
       if (erroNumero) throw erroNumero;
-
-      const { error: erroUpdate } = await supabaseClient
-        .from('comandas')
-        .update({ numero_sequencial: numero })
-        .eq('id', estado.comandaAtual.id);
-
-      if (erroUpdate) throw erroUpdate;
 
       estado.comandaAtual.numero_sequencial = numero;
     }
