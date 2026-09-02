@@ -141,6 +141,26 @@
     letter-spacing: .03em; margin: 18px 0 8px;
   }
   .fechar-caixa-secao-label:first-of-type { margin-top: 0; }
+  .campo { margin-bottom: 16px; }
+  .campo label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .campo-checkbox { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .campo-checkbox input { width: auto; }
+  .bloco-repasse-entrega {
+    background: rgba(232,162,58,.1); border: 1px solid rgba(232,162,58,.35); border-radius: var(--radius-md);
+    padding: 14px; margin: 14px 0;
+  }
+  .bloco-repasse-entrega-titulo {
+    font-size: 12.5px; font-weight: 700; color: var(--crust); text-transform: uppercase;
+    letter-spacing: .02em; margin-bottom: 8px;
+  }
+  .bloco-repasse-entrega-valor {
+    font-family: var(--font-display); font-size: 22px; font-weight: 800; margin-bottom: 6px;
+  }
+  .bloco-repasse-entrega-aviso { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; }
+  .btn-lancar-despesa-entrega {
+    width: 100%; padding: 10px; border-radius: var(--radius-sm); background: var(--crust);
+    color: var(--ink); font-size: 13px; font-weight: 700;
+  }
   .btn-imprimir-conferencia-caixa {
     width: 100%; margin-top: 12px; padding: 11px; border-radius: var(--radius-md);
     background: var(--ink-line); color: var(--text-primary); font-size: 13px; font-weight: 600;
@@ -437,6 +457,8 @@
     <div class="fechar-caixa-secao-label">Resumo do turno</div>
     <div id="fechar-caixa-resumo-formas"></div>
 
+    <div id="fechar-caixa-bloco-entrega" style="display:none;"></div>
+
     <div class="fechar-caixa-secao-label">Conferência de caixa (dinheiro físico)</div>
     <div id="fechar-caixa-conferencia"></div>
 
@@ -453,6 +475,29 @@
     <div class="modal-botoes">
       <button class="btn-ghost" onclick="fecharModalFecharCaixa()">Cancelar</button>
       <button class="btn-primary" onclick="confirmarFechamentoCaixa()">Fechar caixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: lançar despesa do motoboy rapidamente -->
+<div id="modal-despesa-entrega-overlay" class="modal-caixa-overlay">
+  <div class="modal-caixa-conteudo" style="max-width:380px;">
+    <h3>🛵 Lançar despesa de entrega</h3>
+    <div class="campo">
+      <label>Descrição</label>
+      <input type="text" id="input-despesa-entrega-descricao" value="Repasse de entrega — motoboy">
+    </div>
+    <div class="campo">
+      <label>Valor (R$)</label>
+      <input type="text" inputmode="decimal" id="input-despesa-entrega-valor">
+    </div>
+    <div class="campo-checkbox">
+      <input type="checkbox" id="input-despesa-entrega-ja-pago" checked>
+      <label for="input-despesa-entrega-ja-pago" style="margin:0;">Já foi pago</label>
+    </div>
+    <div class="modal-botoes">
+      <button class="btn-ghost" onclick="fecharModalDespesaEntrega()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarDespesaEntrega()">Salvar despesa</button>
     </div>
   </div>
 </div>
