@@ -1376,12 +1376,13 @@ async function abrirVerTurno(turnoId) {
   const fimPeriodo = turno.fechado_em || new Date().toISOString();
   const { data: fechamentosNoTurno } = await supabaseClient
     .from('fechamentos')
-    .select('id, comandas!inner(estabelecimento_id)')
+    .select('id, taxa_entrega_valor, comandas!inner(estabelecimento_id)')
     .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
     .gte('fechado_em', turno.aberto_em)
     .lte('fechado_em', fimPeriodo);
 
   const idsFechamentos = (fechamentosNoTurno || []).map(f => f.id);
+  const totalRepasseEntrega = (fechamentosNoTurno || []).reduce((s, f) => s + Number(f.taxa_entrega_valor || 0), 0);
   let pagamentos = [];
   if (idsFechamentos.length > 0) {
     const { data } = await supabaseClient.from('pagamentos').select('forma_pagamento, valor').in('fechamento_id', idsFechamentos);
@@ -1412,6 +1413,13 @@ async function abrirVerTurno(turnoId) {
     <div class="fechar-caixa-secao-label">Resumo do turno</div>
     ${linhasFormas}
     <div class="fechar-caixa-linha total"><span>Total recebido</span><span>R$ ${totalGeral.toFixed(2).replace('.', ',')}</span></div>
+    ${totalRepasseEntrega > 0 ? `
+      <div class="bloco-repasse-entrega" style="margin-top:14px;">
+        <div class="bloco-repasse-entrega-titulo">🛵 Repasse de entrega (terceirizada)</div>
+        <div class="bloco-repasse-entrega-valor">R$ ${totalRepasseEntrega.toFixed(2).replace('.', ',')}</div>
+        <div class="bloco-repasse-entrega-aviso">Já incluso no total recebido acima — não é lucro seu, é repasse pro motoboy.</div>
+      </div>
+    ` : ''}
     <div class="fechar-caixa-secao-label">Conferência de caixa</div>
     <div class="fechar-caixa-linha"><span>Troco inicial</span><span>R$ ${Number(turno.valor_abertura).toFixed(2).replace('.', ',')}</span></div>
     ${turno.valor_esperado != null ? `<div class="fechar-caixa-linha"><span>Esperado na gaveta</span><span>R$ ${Number(turno.valor_esperado).toFixed(2).replace('.', ',')}</span></div>` : ''}
