@@ -145,7 +145,15 @@ function mostrarPeriodoPersonalizado() {
 function atualizarPeriodoPersonalizado() {
   const inicio = document.getElementById('input-data-inicio').value;
   const fim = document.getElementById('input-data-fim').value;
-  if (!inicio || !fim) return;
+  if (!inicio || !fim) {
+    mostrarToast('Preenche as duas datas antes de aplicar.', 'erro');
+    return;
+  }
+  if (inicio > fim) {
+    mostrarToast('A data de início não pode ser depois da data de fim.', 'erro');
+    return;
+  }
+  estado.periodoAtivo = 'personalizado';
   estado.dataInicio = inicio;
   estado.dataFim = fim;
   carregarRelatorios();
