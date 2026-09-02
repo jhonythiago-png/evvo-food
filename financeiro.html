@@ -68,6 +68,19 @@
   .card-valor.positivo { color: var(--ok); }
   .card-valor.negativo { color: var(--paprika); }
 
+  .card-saldo-geral {
+    background: var(--ink-soft); border: 1px solid var(--crust); border-radius: var(--radius-lg);
+    padding: 18px 20px; margin-bottom: 20px;
+  }
+  .card-saldo-geral-label {
+    font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+    color: var(--crust); letter-spacing: .03em; margin-bottom: 8px;
+  }
+  .card-saldo-geral-obs { text-transform: none; color: var(--text-muted); font-size: 10.5px; letter-spacing: 0; }
+  .card-saldo-geral-valor { font-family: var(--font-display); font-weight: 800; font-size: 32px; }
+  .card-saldo-geral-valor.positivo { color: var(--ok); }
+  .card-saldo-geral-valor.negativo { color: var(--paprika); }
+
   /* ---- Grid de 2 colunas (relatórios lado a lado no desktop) ---- */
   .grid-relatorios { display: grid; grid-template-columns: 1fr; gap: 20px; }
   @media (min-width: 900px) {
@@ -163,6 +176,11 @@
 <div class="main-area">
 
 <div class="conteudo">
+
+  <div class="card-saldo-geral">
+    <div class="card-saldo-geral-label">💰 Saldo geral da empresa <span class="card-saldo-geral-obs">(sempre atualizado, não depende do filtro abaixo)</span></div>
+    <div class="card-saldo-geral-valor" id="card-saldo-geral">R$ 0,00</div>
+  </div>
 
   <div class="painel">
     <div class="secao-titulo"><span class="tag">01</span> Período</div>

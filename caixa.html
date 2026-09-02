@@ -511,6 +511,15 @@
   </div>
 </div>
 
+<!-- MODAL: ver detalhes de um turno específico, sem precisar imprimir -->
+<div id="modal-ver-turno-overlay" class="modal-caixa-overlay">
+  <div class="modal-caixa-conteudo" style="max-width:420px;">
+    <button class="modal-fechar" onclick="fecharVerTurno()">✕</button>
+    <h3 id="ver-turno-titulo">Turno</h3>
+    <div id="ver-turno-conteudo"><div class="aviso-vazio-pequeno">Carregando...</div></div>
+  </div>
+</div>
+
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/caixa.js"></script>
