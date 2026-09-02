@@ -59,6 +59,15 @@ input:focus, select:focus, textarea:focus {
   outline-offset: 1px;
 }
 
+/* O ícone do calendário nativo (Chrome/Edge/Safari) vem preto por padrão —
+   fica invisível no nosso fundo escuro, fazendo parecer que o campo de
+   data só aceita digitar. Isso deixa o ícone branco, visível e clicável. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  padding: 4px;
+}
+
 .btn-primary {
   background: var(--crust);
   color: var(--ink);
