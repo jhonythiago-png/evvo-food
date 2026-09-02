@@ -1035,7 +1035,7 @@ async function abrirModalFecharCaixa() {
   // Supabase não processa direito e causava erro)
   const { data: fechamentosNoTurno, error: erroFechamentos } = await supabaseClient
     .from('fechamentos')
-    .select('id, comandas!inner(estabelecimento_id)')
+    .select('id, taxa_entrega_valor, comandas!inner(estabelecimento_id)')
     .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
     .gte('fechado_em', inicio)
     .lte('fechado_em', fim);
@@ -1044,6 +1044,25 @@ async function abrirModalFecharCaixa() {
     console.error(erroFechamentos);
     document.getElementById('fechar-caixa-resumo-formas').innerHTML = '<div class="aviso-vazio-pequeno">Erro ao calcular.</div>';
     return;
+  }
+
+  // Soma de todas as taxas de entrega do turno — repasse pro motoboy,
+  // independente de como o cliente pagou (dinheiro, pix, cartão...)
+  const totalRepasseEntrega = (fechamentosNoTurno || []).reduce((s, f) => s + Number(f.taxa_entrega_valor || 0), 0);
+  const blocoEntrega = document.getElementById('fechar-caixa-bloco-entrega');
+  if (totalRepasseEntrega > 0) {
+    blocoEntrega.style.display = 'block';
+    blocoEntrega.innerHTML = `
+      <div class="bloco-repasse-entrega">
+        <div class="bloco-repasse-entrega-titulo">🛵 Repasse de entrega (terceirizada)</div>
+        <div class="bloco-repasse-entrega-valor">R$ ${totalRepasseEntrega.toFixed(2).replace('.', ',')}</div>
+        <div class="bloco-repasse-entrega-aviso">Esse valor já está incluso no que foi recebido acima — mas não é lucro seu, é repasse pro motoboy.</div>
+        <button class="btn-lancar-despesa-entrega" onclick="abrirModalDespesaEntrega(${totalRepasseEntrega})">+ Lançar despesa do motoboy agora</button>
+      </div>
+    `;
+  } else {
+    blocoEntrega.style.display = 'none';
+    blocoEntrega.innerHTML = '';
   }
 
   const idsFechamentos = (fechamentosNoTurno || []).map(f => f.id);
@@ -1305,6 +1324,55 @@ async function imprimirConferenciaCaixa() {
   }
 
   mostrarToast('Conferência enviada pra impressão! 🖨️');
+}
+
+// ------------------------------------------------------------
+// Lançar despesa de entrega rapidamente, direto do fechamento de caixa —
+// evita esquecer de registrar o repasse do motoboy depois
+// ------------------------------------------------------------
+function abrirModalDespesaEntrega(valorSugerido) {
+  document.getElementById('input-despesa-entrega-descricao').value = 'Repasse de entrega — motoboy';
+  document.getElementById('input-despesa-entrega-valor').value = String(valorSugerido.toFixed(2)).replace('.', ',');
+  document.getElementById('input-despesa-entrega-ja-pago').checked = true;
+  document.getElementById('modal-despesa-entrega-overlay').style.display = 'flex';
+}
+
+function fecharModalDespesaEntrega() {
+  document.getElementById('modal-despesa-entrega-overlay').style.display = 'none';
+}
+
+async function salvarDespesaEntrega() {
+  const descricao = document.getElementById('input-despesa-entrega-descricao').value.trim();
+  const valorTexto = document.getElementById('input-despesa-entrega-valor').value;
+  const jaPago = document.getElementById('input-despesa-entrega-ja-pago').checked;
+  const valor = parseFloat((valorTexto || '').replace(',', '.'));
+
+  if (!descricao || !valor || valor <= 0) {
+    mostrarToast('Preenche descrição e valor.', 'erro');
+    return;
+  }
+
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  const { error } = await supabaseClient.from('despesas').insert({
+    estabelecimento_id: estado.perfil.estabelecimento_id,
+    descricao,
+    categoria: 'entrega',
+    valor,
+    data_vencimento: hoje,
+    status: jaPago ? 'pago' : 'pendente',
+    data_pagamento: jaPago ? hoje : null,
+    criado_por: estado.perfil.id,
+  });
+
+  if (error) {
+    mostrarToast('Erro ao salvar despesa.', 'erro');
+    console.error(error);
+    return;
+  }
+
+  mostrarToast('Despesa lançada! 🛵');
+  fecharModalDespesaEntrega();
 }
 
 iniciar();

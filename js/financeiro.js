@@ -16,7 +16,7 @@ const estado = {
 const NOMES_CATEGORIA = {
   fornecedor: 'Fornecedor', aluguel: 'Aluguel', funcionario: 'Funcionário',
   insumo: 'Insumo', energia: 'Energia', agua: 'Água', internet: 'Internet',
-  manutencao: 'Manutenção', outro: 'Outro',
+  manutencao: 'Manutenção', entrega: 'Entrega (motoboy)', outro: 'Outro',
 };
 const NOMES_PAGAMENTO = { dinheiro: 'Dinheiro', debito: 'Débito', credito: 'Crédito', pix: 'Pix' };
 
