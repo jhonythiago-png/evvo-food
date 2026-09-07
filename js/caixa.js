@@ -153,7 +153,7 @@ async function verDetalhesHistorico(fechamentoId) {
   const comanda = fechamento.comandas;
 
   document.getElementById('modal-ver-historico-overlay').style.display = 'flex';
-  document.getElementById('ver-historico-titulo').textContent = rotuloComanda(comanda);
+  document.getElementById('ver-historico-titulo').innerHTML = rotuloComanda(comanda) + badgeEntregaHibrida({ tipo: comanda.tipo, taxa_entrega_valor: fechamento.taxa_entrega_valor });
   document.getElementById('ver-historico-numero').textContent = `Comanda #${comanda.numero_sequencial}${comanda.perfis?.nome ? ` · Atendente: ${comanda.perfis.nome}` : ''}`;
   document.getElementById('ver-historico-conteudo').innerHTML = '<div class="aviso-vazio-pequeno">Carregando...</div>';
 
@@ -304,6 +304,18 @@ function rotuloComanda(c) {
   return c.nome_cliente ? `Balcão · ${escapeHtml(c.nome_cliente)}` : 'Balcão';
 }
 
+// Comanda que NASCEU como mesa/balcão mas ganhou taxa de entrega depois
+// (o cliente pediu retirada e depois trocou pra entrega) — mostra um
+// selo extra, sem mudar o tipo original da comanda
+function temEntregaHibrida(c) {
+  const taxa = c.taxa_entrega ?? c.taxa_entrega_valor ?? 0;
+  return c.tipo !== 'entrega' && Number(taxa) > 0;
+}
+
+function badgeEntregaHibrida(c) {
+  return temEntregaHibrida(c) ? '<span class="badge-entrega-hibrida">🛵 Entrega</span>' : '';
+}
+
 function tempoAberta(dataIso) {
   const minutos = Math.floor((Date.now() - new Date(dataIso).getTime()) / 60000);
   if (minutos < 1) return 'agora mesmo';
@@ -342,6 +354,7 @@ function renderComandas() {
     <button class="ticket-card" onclick="${acaoClick}">
       <div class="ticket-row1">
         <span class="badge">${rotuloComanda(c)}</span>
+        ${badgeEntregaHibrida(c)}
         <span class="dot"></span>
       </div>
       <div class="ticket-numero">${c.numero_sequencial ? `Comanda #${c.numero_sequencial}` : 'Sem pedido ainda'}</div>
@@ -463,7 +476,7 @@ function renderFechamento() {
   const { comanda, itens, comandasIrmas } = estado.comandaEmFechamento;
   const { subtotal, taxaValor, total } = calcularValores();
 
-  document.getElementById('fechamento-titulo').textContent = rotuloComanda(comanda);
+  document.getElementById('fechamento-titulo').innerHTML = rotuloComanda(comanda) + badgeEntregaHibrida(comanda);
   document.getElementById('fechamento-codigo').textContent = comanda.numero_sequencial ? `COMANDA #${comanda.numero_sequencial}` : 'AGUARDANDO 1º PEDIDO';
   document.getElementById('fechamento-atendente').textContent = formatarAtendentes(comanda.nomes_atendentes) || '';
 
@@ -798,49 +811,32 @@ async function confirmarFechamento() {
   btn.textContent = ehSaidaEntrega ? 'Confirmando saída...' : 'Fechando...';
 
   try {
-    const { data: fechamento, error: erroFechamento } = await supabaseClient
-      .from('fechamentos')
-      .insert({
-        comanda_id: comanda.id,
-        subtotal_itens: subtotal,
-        taxa_servico_percentual: estado.taxaServicoPercentual,
-        taxa_servico_valor: taxaValor,
-        taxa_entrega_valor: estado.taxaEntregaValor,
-        valor_total: total,
-        fechado_por: estado.perfil.id,
-      })
-      .select()
-      .single();
-
-    if (erroFechamento) throw erroFechamento;
-
     const linhasPagamento = estado.pagamentos.map(p => ({
-      fechamento_id: fechamento.id,
       forma_pagamento: p.forma,
       valor: p.valor,
       valor_recebido: p.forma === 'dinheiro' && p.valorRecebido ? p.valorRecebido : null,
     }));
 
-    const { error: erroPagamentos } = await supabaseClient.from('pagamentos').insert(linhasPagamento);
-    if (erroPagamentos) throw erroPagamentos;
+    // Tudo isso acontece numa transação só, no banco — se qualquer parte
+    // falhar (rede caiu no meio), TUDO desfaz sozinho, sem deixar
+    // fechamento "pela metade" travando a comanda pra sempre
+    const { error: erroFechar } = await supabaseClient.rpc('fn_fechar_comanda', {
+      p_comanda_id: comanda.id,
+      p_subtotal_itens: subtotal,
+      p_taxa_servico_percentual: estado.taxaServicoPercentual,
+      p_taxa_servico_valor: taxaValor,
+      p_taxa_entrega_valor: estado.taxaEntregaValor,
+      p_valor_total: total,
+      p_fechado_por: estado.perfil.id,
+      p_eh_saida_entrega: ehSaidaEntrega,
+      p_pagamentos: linhasPagamento,
+    });
+
+    if (erroFechar) throw erroFechar;
 
     if (ehSaidaEntrega) {
-      // Não fecha de vez — só avança pro estágio "saiu pra entrega".
-      // A comanda continua "aberta" até o motoboy voltar e confirmar.
-      const { error: erroComanda } = await supabaseClient
-        .from('comandas')
-        .update({ status_entrega: 'saiu_entrega' })
-        .eq('id', comanda.id);
-      if (erroComanda) throw erroComanda;
-
       mostrarToast('Saiu pra entrega! Cupom com a forma de pagamento vai ser impresso. 🛵');
     } else {
-      const { error: erroComanda } = await supabaseClient
-        .from('comandas')
-        .update({ status: 'fechada', fechada_em: new Date().toISOString() })
-        .eq('id', comanda.id);
-      if (erroComanda) throw erroComanda;
-
       mostrarToast('Conta fechada com sucesso! 🎉');
     }
 
