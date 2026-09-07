@@ -486,10 +486,12 @@ function renderChipSabor(itemIngrediente, unico = false) {
   const selecionado = estado.selecaoSabores.includes(id);
   const item = estado.itemEmEdicao;
   const posicao = estado.selecaoSabores.indexOf(id);
-  // Só é "acréscimo de verdade" (vermelho) quando passa do 3º sabor —
-  // o 3º em si (posição == cota) é o degrau especial, mas continua
-  // sendo tratado como sabor normal (verde), não como acréscimo
-  const foiAcrescimo = selecionado && !unico && posicao > item.qtd_sabores_inclusos;
+  // O degrau especial (preço fixo no sabor logo após a cota) só existe
+  // se o item tiver esse preço configurado (ex: Monte Seu Pastel). Sem
+  // isso, tudo que passar da cota já é acréscimo normal, sem degrau.
+  const temDegrau = Number(item.preco_terceiro_sabor) > 0;
+  const posicaoDegrau = temDegrau ? item.qtd_sabores_inclusos : item.qtd_sabores_inclusos - 1;
+  const foiAcrescimo = selecionado && !unico && posicao > posicaoDegrau;
 
   let classe = 'chip';
   let sufixo = '';
@@ -555,13 +557,14 @@ function atualizarTotalModal() {
   let total = item.preco_base;
 
   if (item.tipo_montagem === 'monte_sabores') {
-    // Degrau especial: o sabor EXATAMENTE na posição da cota (o 3º, se a
-    // cota for 2) cobra um valor fixo próprio — diferente do acréscimo
-    // "normal" que se aplica só do 4º sabor em diante
+    // Degrau especial: só existe se o item tiver um preço configurado
+    // pra isso (ex: Monte Seu Pastel). Sem isso, tudo que passar da
+    // cota já é acréscimo normal, direto — sem degrau nenhum no meio.
+    const temDegrau = Number(item.preco_terceiro_sabor) > 0;
     estado.selecaoSabores.forEach((id, pos) => {
-      if (pos === item.qtd_sabores_inclusos) {
+      if (temDegrau && pos === item.qtd_sabores_inclusos) {
         total += Number(item.preco_terceiro_sabor || 0);
-      } else if (pos > item.qtd_sabores_inclusos) {
+      } else if (pos > item.qtd_sabores_inclusos || (!temDegrau && pos === item.qtd_sabores_inclusos)) {
         const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
         if (ii) total += ii.preco_acrescimo;
       }
@@ -624,17 +627,21 @@ function confirmarAdicaoAoCarrinho() {
       mostrarToast('Escolha pelo menos 1 sabor.', 'erro');
       return;
     }
+    // Degrau especial: só existe se o item tiver um preço configurado
+    // pra isso (ex: Monte Seu Pastel). Sem isso, tudo que passar da
+    // cota já é acréscimo normal, direto — sem degrau nenhum no meio.
+    const temDegrau = Number(item.preco_terceiro_sabor) > 0;
     sabores = estado.selecaoSabores.map((id, pos) => {
       const ii = item.item_ingredientes.find(x => x.ingredientes.id === id);
-      if (pos === item.qtd_sabores_inclusos) {
+      if (temDegrau && pos === item.qtd_sabores_inclusos) {
         // É exatamente o sabor do "degrau" (ex: o 3º, numa cota de 2) —
         // cobra o valor fixo próprio dele, mas continua aparecendo como
         // sabor normal no cupom (não é tratado como "acréscimo")
         precoUnitario += Number(item.preco_terceiro_sabor || 0);
         return { id, nome: ii.ingredientes.nome, foiAcrescimo: false, foiSubstituicao: false, precoAcrescimo: Number(item.preco_terceiro_sabor || 0) };
       }
-      if (pos > item.qtd_sabores_inclusos) {
-        // Além do degrau (ex: o 4º sabor) — aí sim é acréscimo de verdade
+      if (pos > item.qtd_sabores_inclusos || (!temDegrau && pos === item.qtd_sabores_inclusos)) {
+        // Além da cota — acréscimo de verdade
         precoUnitario += ii.preco_acrescimo;
         return { id, nome: ii.ingredientes.nome, foiAcrescimo: true, foiSubstituicao: false, precoAcrescimo: ii.preco_acrescimo };
       }
@@ -642,9 +649,13 @@ function confirmarAdicaoAoCarrinho() {
     });
     observacao = obsExtra || null;
 
-    // Nome dinâmico: "— 2 sabores" ou "— 3 sabores" (trava em 3, mesmo
-    // que a pessoa escolha um 4º — esse 4º vira só um acréscimo à parte)
-    const qtdParaNome = Math.min(estado.selecaoSabores.length, item.qtd_sabores_inclusos + 1);
+    // Nome dinâmico: "— 2 sabores" ou "— 3 sabores" quando tem degrau
+    // configurado (trava no degrau, mesmo que a pessoa escolha mais —
+    // esses viram só acréscimo à parte). Sem degrau, mostra a
+    // quantidade real escolhida.
+    const qtdParaNome = temDegrau
+      ? Math.min(estado.selecaoSabores.length, item.qtd_sabores_inclusos + 1)
+      : Math.min(estado.selecaoSabores.length, item.qtd_sabores_inclusos);
     nomeExibicao = `${item.nome} — ${qtdParaNome} sabores`;
 
   } else if (item.tipo_montagem === 'escolha_um') {
