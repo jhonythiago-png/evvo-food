@@ -25,7 +25,7 @@ async function verificarAutenticacao() {
 
   const { data: perfil, error } = await supabaseClient
     .from('perfis')
-    .select('id, nome, username, nivel_acesso, estabelecimento_id, ativo, precisa_trocar_senha')
+    .select('id, nome, username, nivel_acesso, estabelecimento_id, ativo, precisa_trocar_senha, pode_cancelar')
     .eq('auth_user_id', sessao.session.user.id)
     .single();
 

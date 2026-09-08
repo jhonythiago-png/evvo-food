@@ -198,7 +198,7 @@ function mostrarAba(aba) {
 async function carregarFuncionarios() {
   const { data, error } = await supabaseClient
     .from('perfis')
-    .select('id, username, nome, nivel_acesso, ativo, criado_em')
+    .select('id, username, nome, nivel_acesso, ativo, pode_cancelar, criado_em')
     .eq('estabelecimento_id', estado.perfil.estabelecimento_id)
     .order('criado_em', { ascending: true });
 
@@ -255,6 +255,7 @@ function abrirModalEditarFuncionario(perfilId) {
   document.getElementById('input-editar-func-username').value = f.username;
   document.getElementById('input-editar-func-senha').value = '';
   document.getElementById('input-editar-func-senha-confirmar').value = '';
+  document.getElementById('input-editar-func-pode-cancelar').checked = f.pode_cancelar || false;
   document.getElementById('modal-editar-funcionario-overlay').style.display = 'flex';
 }
 
@@ -268,6 +269,7 @@ async function salvarEdicaoFuncionario() {
   const novoUsername = document.getElementById('input-editar-func-username').value.trim().toLowerCase();
   const novaSenha = document.getElementById('input-editar-func-senha').value;
   const novaSenhaConfirmar = document.getElementById('input-editar-func-senha-confirmar').value;
+  const podeCancelar = document.getElementById('input-editar-func-pode-cancelar').checked;
 
   if (!novoNome || !novoUsername) {
     mostrarToast('Preenche nome e usuário.', 'erro');
@@ -305,6 +307,14 @@ async function salvarEdicaoFuncionario() {
     }
 
     mostrarToast('Funcionário atualizado!');
+
+    // Essa permissão não passa pela função de borda — atualiza direto
+    const { error: erroPermissao } = await supabaseClient
+      .from('perfis')
+      .update({ pode_cancelar: podeCancelar })
+      .eq('id', perfilId);
+    if (erroPermissao) console.error('Erro ao atualizar permissão de cancelar:', erroPermissao);
+
     fecharModalEditarFuncionario();
     await carregarFuncionarios();
 
@@ -355,6 +365,7 @@ function abrirModalFuncionario() {
   document.getElementById('input-func-nome').value = '';
   document.getElementById('input-func-username').value = '';
   document.getElementById('input-func-senha').value = '';
+  document.getElementById('input-func-pode-cancelar').checked = false;
   document.getElementById('modal-funcionario-overlay').style.display = 'flex';
 }
 
@@ -367,6 +378,7 @@ async function salvarNovoFuncionario() {
   const username = document.getElementById('input-func-username').value.trim().toLowerCase();
   const senha = document.getElementById('input-func-senha').value;
   const senhaConfirmar = document.getElementById('input-func-senha-confirmar').value;
+  const podeCancelar = document.getElementById('input-func-pode-cancelar').checked;
 
   if (!nome || !username || !senha) {
     mostrarToast('Preenche nome, usuário e senha.', 'erro');
@@ -405,6 +417,18 @@ async function salvarNovoFuncionario() {
     }
 
     mostrarToast(`Funcionário "${nome}" criado com sucesso!`);
+
+    // A criação em si roda numa função de borda que não mexe nessa
+    // permissão — se marcou a caixinha, aplica com uma atualização à
+    // parte, direto pelo username (já único, acabou de ser criado)
+    if (podeCancelar) {
+      const { error: erroPermissao } = await supabaseClient
+        .from('perfis')
+        .update({ pode_cancelar: true })
+        .eq('username', username);
+      if (erroPermissao) console.error('Erro ao aplicar permissão de cancelar:', erroPermissao);
+    }
+
     fecharModalFuncionario();
     await carregarFuncionarios();
 

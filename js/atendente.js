@@ -26,6 +26,10 @@ async function iniciar() {
 
   injetarNavegacao(estado.perfil, 'atendente');
 
+  // Esconde o botão de cancelar comanda inteira se o usuário não tiver
+  // permissão pra isso (Master sempre vê; funcionário só se habilitado)
+  document.getElementById('btn-cancelar-comanda').style.display = usuarioPodeCancelar() ? 'block' : 'none';
+
   await carregarConfiguracaoEstabelecimento();
   await carregarCardapio();
   await carregarComandasAbertas();
@@ -241,6 +245,12 @@ async function carregarComandasAbertas() {
       ${c.perfis?.nome ? `<span class="comanda-atendente">Atendente: ${escapeHtml(c.perfis.nome)}</span>` : ''}
     </button>
   `).join('');
+}
+
+// Master sempre pode cancelar item/comanda — funcionário só se o
+// Master tiver habilitado essa permissão especificamente pra ele
+function usuarioPodeCancelar() {
+  return estado.perfil.nivel_acesso === 'master' || estado.perfil.pode_cancelar === true;
 }
 
 function rotuloComanda(c) {
@@ -932,8 +942,9 @@ async function abrirPedidosEnviados() {
         nomeItem = `${nomeItem} — ${qtdParaNome} sabores`;
       }
 
-      // Só permite cancelar se ainda não foi entregue (ainda dá tempo de avisar a cozinha)
-      const podeCancel = pi.status === 'enviado' || pi.status === 'impresso';
+      // Só permite cancelar se ainda não foi entregue (ainda dá tempo de
+      // avisar a cozinha) E se esse usuário tem permissão pra cancelar
+      const podeCancel = (pi.status === 'enviado' || pi.status === 'impresso') && usuarioPodeCancelar();
       return `
         <div class="pedido-enviado-linha">
           <div class="linha-topo">
