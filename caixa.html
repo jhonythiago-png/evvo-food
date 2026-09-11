@@ -346,7 +346,15 @@
   </div>
   <div class="historico-periodo">
     <button class="periodo-chip on" id="chip-historico-hoje" onclick="selecionarPeriodoHistorico('hoje')">Hoje</button>
+    <button class="periodo-chip" id="chip-historico-ontem" onclick="selecionarPeriodoHistorico('ontem')">Ontem</button>
     <button class="periodo-chip" id="chip-historico-semana" onclick="selecionarPeriodoHistorico('semana')">Últimos 7 dias</button>
+    <button class="periodo-chip" id="chip-historico-personalizado" onclick="mostrarPeriodoHistoricoPersonalizado()">Personalizado</button>
+  </div>
+  <div id="historico-periodo-personalizado" style="display:none; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+    <input type="date" id="input-historico-data-inicio" style="flex:1; min-width:130px;">
+    <span style="color:var(--text-muted);">até</span>
+    <input type="date" id="input-historico-data-fim" style="flex:1; min-width:130px;">
+    <button class="btn-primary" style="padding:9px 16px; font-size:13px; flex-shrink:0;" onclick="aplicarPeriodoHistoricoPersonalizado()">Aplicar</button>
   </div>
   <div id="grid-historico"><div class="aviso-vazio">Carregando...</div></div>
 </div>
