@@ -12,6 +12,8 @@ const estado = {
   pagamentos: [],               // [{ forma, valor }]
   historico: [],
   periodoHistorico: 'hoje',
+  historicoDataInicio: null,
+  historicoDataFim: null,
   caixaAtual: null,             // turno de caixa aberto agora (ou null se fechado)
   historicoCaixas: [],
 };
@@ -64,6 +66,10 @@ async function carregarComandas() {
 function abrirHistorico() {
   document.getElementById('tela-comandas').style.display = 'none';
   document.getElementById('tela-historico').style.display = 'flex';
+  // Evita cair em "personalizado" sem datas definidas (ex: primeiro acesso)
+  if (estado.periodoHistorico === 'personalizado' && !estado.historicoDataInicio) {
+    estado.periodoHistorico = 'hoje';
+  }
   selecionarPeriodoHistorico(estado.periodoHistorico);
 }
 
@@ -76,6 +82,30 @@ function selecionarPeriodoHistorico(periodo) {
   estado.periodoHistorico = periodo;
   document.querySelectorAll('.historico-periodo .periodo-chip').forEach(el => el.classList.remove('on'));
   document.getElementById(`chip-historico-${periodo}`).classList.add('on');
+  document.getElementById('historico-periodo-personalizado').style.display = 'none';
+  carregarHistorico();
+}
+
+function mostrarPeriodoHistoricoPersonalizado() {
+  document.querySelectorAll('.historico-periodo .periodo-chip').forEach(el => el.classList.remove('on'));
+  document.getElementById('chip-historico-personalizado').classList.add('on');
+  document.getElementById('historico-periodo-personalizado').style.display = 'flex';
+}
+
+function aplicarPeriodoHistoricoPersonalizado() {
+  const inicio = document.getElementById('input-historico-data-inicio').value;
+  const fim = document.getElementById('input-historico-data-fim').value;
+  if (!inicio || !fim) {
+    mostrarToast('Preenche as duas datas antes de aplicar.', 'erro');
+    return;
+  }
+  if (inicio > fim) {
+    mostrarToast('A data de início não pode ser depois da data de fim.', 'erro');
+    return;
+  }
+  estado.periodoHistorico = 'personalizado';
+  estado.historicoDataInicio = inicio;
+  estado.historicoDataFim = fim;
   carregarHistorico();
 }
 
@@ -84,14 +114,25 @@ async function carregarHistorico() {
   grid.innerHTML = '<div class="aviso-vazio">Carregando...</div>';
 
   const hoje = new Date();
-  const fim = hoje.toISOString();
-  let inicioData;
+  let inicioData, fimData;
+
   if (estado.periodoHistorico === 'hoje') {
     inicioData = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    fimData = hoje;
+  } else if (estado.periodoHistorico === 'ontem') {
+    const ontem = new Date(hoje);
+    ontem.setDate(ontem.getDate() - 1);
+    inicioData = new Date(ontem.getFullYear(), ontem.getMonth(), ontem.getDate());
+    fimData = new Date(ontem.getFullYear(), ontem.getMonth(), ontem.getDate(), 23, 59, 59);
+  } else if (estado.periodoHistorico === 'personalizado') {
+    inicioData = new Date(estado.historicoDataInicio + 'T00:00:00');
+    fimData = new Date(estado.historicoDataFim + 'T23:59:59');
   } else {
+    // 'semana' — últimos 7 dias
     inicioData = new Date(hoje);
     inicioData.setDate(inicioData.getDate() - 6);
     inicioData.setHours(0, 0, 0, 0);
+    fimData = hoje;
   }
 
   const { data, error } = await supabaseClient
@@ -103,7 +144,7 @@ async function carregarHistorico() {
     .eq('comandas.estabelecimento_id', estado.perfil.estabelecimento_id)
     .eq('comandas.status', 'fechada')
     .gte('fechado_em', inicioData.toISOString())
-    .lte('fechado_em', fim)
+    .lte('fechado_em', fimData.toISOString())
     .order('fechado_em', { ascending: false })
     .limit(50);
 
